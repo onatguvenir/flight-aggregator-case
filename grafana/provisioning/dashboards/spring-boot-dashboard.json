@@ -1,0 +1,426 @@
+{
+    "__inputs": [],
+    "__requires": [],
+    "annotations": {
+        "list": []
+    },
+    "editable": false,
+    "gnetId": null,
+    "graphTooltip": 0,
+    "id": null,
+    "iteration": 1708000000000,
+    "links": [],
+    "panels": [
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 0
+            },
+            "id": 1,
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ]
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "background"
+            },
+            "title": "JVM Heap Kullanımı",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "jvm_memory_used_bytes{area=\"heap\", job=\"flight-aggregator\"} / jvm_memory_max_bytes{area=\"heap\", job=\"flight-aggregator\"} * 100",
+                    "legendFormat": "Heap %",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 0
+            },
+            "id": 2,
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ]
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "background"
+            },
+            "title": "Aktif Thread Sayısı",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "jvm_threads_live_threads{job=\"flight-aggregator\"}",
+                    "legendFormat": "Thread",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 0
+            },
+            "id": 3,
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ]
+                },
+                "colorMode": "background"
+            },
+            "title": "ProviderA CB Durumu",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "resilience4j_circuitbreaker_state{name=\"providerA\", job=\"flight-aggregator\"}",
+                    "legendFormat": "State",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 0
+            },
+            "id": 4,
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ]
+                },
+                "colorMode": "background"
+            },
+            "title": "ProviderB CB Durumu",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "resilience4j_circuitbreaker_state{name=\"providerB\", job=\"flight-aggregator\"}",
+                    "legendFormat": "State",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 4
+            },
+            "id": 5,
+            "title": "HTTP İstek Hızı (req/s)",
+            "type": "timeseries",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "rate(http_server_requests_seconds_count{job=\"flight-aggregator\"}[1m])",
+                    "legendFormat": "{{uri}} {{method}} {{status}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "s"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 4
+            },
+            "id": 6,
+            "title": "HTTP P95/P99 Latency",
+            "type": "timeseries",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket{job=\"flight-aggregator\"}[5m]))",
+                    "legendFormat": "P95",
+                    "refId": "A"
+                },
+                {
+                    "expr": "histogram_quantile(0.99, rate(http_server_requests_seconds_bucket{job=\"flight-aggregator\"}[5m]))",
+                    "legendFormat": "P99",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "bytes"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 12
+            },
+            "id": 7,
+            "title": "JVM Bellek Kullanımı",
+            "type": "timeseries",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "jvm_memory_used_bytes{job=\"flight-aggregator\", area=\"heap\"}",
+                    "legendFormat": "Heap Used",
+                    "refId": "A"
+                },
+                {
+                    "expr": "jvm_memory_used_bytes{job=\"flight-aggregator\", area=\"nonheap\"}",
+                    "legendFormat": "NonHeap Used",
+                    "refId": "B"
+                },
+                {
+                    "expr": "jvm_memory_max_bytes{job=\"flight-aggregator\", area=\"heap\"}",
+                    "legendFormat": "Heap Max",
+                    "refId": "C"
+                }
+            ]
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 12
+            },
+            "id": 8,
+            "title": "Resilience4j — Circuit Breaker Call Volume",
+            "type": "timeseries",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "rate(resilience4j_circuitbreaker_calls_seconds_count{job=\"flight-aggregator\"}[1m])",
+                    "legendFormat": "{{name}} — {{kind}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 20
+            },
+            "id": 9,
+            "title": "HikariCP — Connection Pool Kullanımı",
+            "type": "timeseries",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "hikaricp_connections_active{job=\"flight-aggregator\"}",
+                    "legendFormat": "Active",
+                    "refId": "A"
+                },
+                {
+                    "expr": "hikaricp_connections_idle{job=\"flight-aggregator\"}",
+                    "legendFormat": "Idle",
+                    "refId": "B"
+                },
+                {
+                    "expr": "hikaricp_connections_pending{job=\"flight-aggregator\"}",
+                    "legendFormat": "Pending",
+                    "refId": "C"
+                }
+            ]
+        },
+        {
+            "datasource": "Prometheus",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 20
+            },
+            "id": 10,
+            "title": "GC Pause Süresi",
+            "type": "timeseries",
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "rate(jvm_gc_pause_seconds_sum{job=\"flight-aggregator\"}[1m])",
+                    "legendFormat": "{{action}} {{cause}}",
+                    "refId": "A"
+                }
+            ]
+        }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 36,
+    "style": "dark",
+    "tags": [
+        "spring-boot",
+        "flight-aggregator",
+        "resilience4j",
+        "jvm"
+    ],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "Flight Aggregator — JVM & API Dashboard",
+    "uid": "flight-aggregator-v1",
+    "version": 1
+}

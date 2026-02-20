@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.technoly</groupId>
+        <artifactId>flight-aggregator</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>application</artifactId>
+    <name>Flight Aggregator - Application</name>
+
+    <!--
+        APPLICATION MODÜLÜ
+        ====================
+        Use case'leri (iş mantığı orkestrasyonu) içerir:
+        - FlightAggregatorService: iki sağlayıcıdan paralel veri çeker
+        - CheapestFlightService: gruplama ve en ucuz seçim mantığı
+        - ApiLogService: log kayıtlarını yönetir
+
+        Infrastructure'a depend eder (port implementasyonlarına erişim için)
+        ama doğrudan framework detaylarından izole tutulur.
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>com.technoly</groupId>
+            <artifactId>domain</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.technoly</groupId>
+            <artifactId>infrastructure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+    </dependencies>
+</project>

@@ -1,0 +1,84 @@
+# =====================================================================
+# QA Profile — Test / Kalite Güvence Ortamı
+# =====================================================================
+# Kullanım:
+#   SPRING_PROFILES_ACTIVE=qa
+#   Değerler CI/CD pipeline'dan env vars ile gelir (.env.qa veya Secrets)
+#
+# Felsefe: Production davranışını simüle et, ancak debug görünürlüğünü koru
+#   - INFO loglama (DEBUG'dan daha az gürültü)
+#   - Swagger etkin (QA ekibi API'yi keşfedebilir)
+#   - Circuit Breaker production değerleri gibi
+#   - SQL logu kapalı (log boyutunu azalt)
+# =====================================================================
+
+spring:
+    # QA'da tüm veriler environment variable'dan gelir, default YOK
+    # Eksik env var → başlatma hatası (kasıtlı: yanlış deploy yakalanır)
+    datasource:
+        url: ${DB_URL}
+        username: ${DB_USER}
+        password: ${DB_PASSWORD}
+    hikari:
+        maximum-pool-size: 10
+        minimum-idle: 2
+
+    data:
+        redis:
+            host: ${REDIS_HOST}
+            port: ${REDIS_PORT:6379}
+            password: ${REDIS_PASSWORD:}
+
+    jpa:
+        properties:
+            hibernate:
+                show_sql: false
+                format_sql: false
+
+# ---- Cache: Orta TTL ----
+cache:
+    flight:
+        ttl-minutes: 5
+
+# ---- Providers: QA servisleri ----
+providers:
+    a:
+        url: ${PROVIDER_A_URL}
+    b:
+        url: ${PROVIDER_B_URL}
+
+# ---- Resilience4j: Production değerleri ----
+resilience4j:
+    circuitbreaker:
+        instances:
+            providerA:
+                failure-rate-threshold: 50
+                wait-duration-in-open-state: 30s
+            providerB:
+                failure-rate-threshold: 50
+                wait-duration-in-open-state: 30s
+    retry:
+        instances:
+            providerA:
+                max-attempts: 3
+            providerB:
+                max-attempts: 3
+
+# ---- Swagger: QA'da açık (test ekibi kullanır) ----
+springdoc:
+    swagger-ui:
+        enabled: true
+
+# ---- Logging: INFO seviye ----
+logging:
+    level:
+        com.technoly: INFO
+        org.springframework.ws: WARN
+        io.github.resilience4j: INFO
+        org.flywaydb: INFO
+
+# ---- Actuator: QA'da health details görünür ----
+management:
+    endpoint:
+        health:
+            show-details: when-authorized

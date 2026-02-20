@@ -1,0 +1,20 @@
+# =====================================================================
+# Grafana — Dashboard Provisioning
+# =====================================================================
+# grafana/dashboards/ klasöründeki tüm JSON dosyalarını otomatik yükler.
+# Her Grafana yeniden başlatıldığında dashboardlar sıfırlanır (disableDeletion=true → override).
+# =====================================================================
+
+apiVersion: 1
+
+providers:
+  - name: "Flight Aggregator Dashboards"
+    orgId: 1
+    folder: "Flight Aggregator" # Grafana'da klasör adı
+    type: file
+    disableDeletion: true # UI'dan silme koruması (IaC)
+    editable: false # Değiştirilmez (override reload ile gelir)
+    updateIntervalSeconds: 30 # 30s'de bir disk değişikliği kontrol et
+    options:
+      # Tüm *.json dosyaları bu klasörden yüklenir
+      path: /etc/grafana/provisioning/dashboards

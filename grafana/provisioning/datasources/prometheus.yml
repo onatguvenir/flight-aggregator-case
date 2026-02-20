@@ -1,0 +1,20 @@
+# =====================================================================
+# Grafana — Datasource Provisioning
+# =====================================================================
+# Bu dosya Grafana başladığında otomatik okunur.
+# Manuel "Add datasource" adımı gerekmez.
+# apiVersion ve providerName Grafana DSL standardına uyar.
+# =====================================================================
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # 'prometheus' = docker-compose servis adı (DNS olarak çözülür)
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false # UI'dan değiştirilemez (infrastructure as code)
+    jsonData:
+      timeInterval: "15s" # Prometheus scrape aralığı ile eşleşmeli

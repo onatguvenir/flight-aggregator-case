@@ -1,0 +1,239 @@
+version: '3.9'
+
+# =====================================================================
+# Flight Aggregator - Docker Compose
+# =====================================================================
+#
+# Çalıştırma:
+#   Local : docker-compose --env-file .env.local up -d
+#   QA    : docker-compose --env-file .env.qa up -d
+#   Prod  : docker-compose --env-file .env.prod up -d
+#
+# Ortam değişkenleri .env.{local|qa|prod} dosyasından gelir.
+# docker-compose'a hard-coded değer YOKTUR — 12-factor app prensibi.
+#
+# Servisler:
+#   - postgres          : PostgreSQL 16
+#   - redis             : Redis 7
+#   - flight-provider-a : ProviderA SOAP (:8081)
+#   - flight-provider-b : ProviderB SOAP (:8082)
+#   - flight-aggregator : REST API (:8080)
+#   - prometheus        : Metrik toplama (:9090)
+#   - grafana           : Dashboard UI (:3000)
+# =====================================================================
+
+services:
+
+  # ========================
+  # PostgreSQL 16
+  # ========================
+  postgres:
+    image: postgres:16-alpine
+    container_name: flight_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flightdb}
+      POSTGRES_USER: ${DB_USER:-flightuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-flightpass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-flightuser} -d ${POSTGRES_DB:-flightdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
+  # Redis 7
+  # ========================
+  redis:
+    image: redis:7-alpine
+    container_name: flight_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    # AOF persistence — container restart sonrasında cache korunur
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
+  # Flight Provider A (SOAP :8081)
+  # ========================
+  flight-provider-a:
+    build:
+      context: ../flightproviderA
+      dockerfile: Dockerfile
+    container_name: flight_provider_a
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: 8081
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Maven build içinde: start_period yüksek tutulur
+      start_period: 120s
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
+  # Flight Provider B (SOAP :8082)
+  # ========================
+  flight-provider-b:
+    build:
+      context: ../flightproviderB
+      dockerfile: Dockerfile
+    container_name: flight_provider_b
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8082/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
+  # Flight Aggregator (REST :8080)
+  # ========================
+  flight-aggregator:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: flight_aggregator
+    ports:
+      - "8080:8080"
+    # Tüm değerler .env.{local|qa|prod} dosyasından gelir
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      DB_URL: ${DB_URL}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      PROVIDER_A_URL: ${PROVIDER_A_URL}
+      PROVIDER_B_URL: ${PROVIDER_B_URL}
+      CACHE_TTL_MINUTES: ${CACHE_TTL_MINUTES:-5}
+      LOG_LEVEL_APP: ${LOG_LEVEL_APP:-INFO}
+      LOG_LEVEL_SPRING: ${LOG_LEVEL_SPRING:-WARN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      flight-provider-a:
+        condition: service_healthy
+      flight-provider-b:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
+  # Prometheus — Metrik toplama
+  # ========================
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    container_name: flight_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      # prometheus.yml: scrape config (hangi servisleri izle)
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      # 15 günlük veri saklama (production'da artır veya remote storage kullan)
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'     # API ile config reload: POST /-/reload
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - flight-aggregator
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
+  # Grafana — Dashboard UI
+  # ========================
+  grafana:
+    image: grafana/grafana:10.3.3
+    container_name: flight_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      # Admin kullanıcı — .env dosyasından gelir
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      # Anonim erişim yok (güvenlik)
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      # Kullanıcı kayıt formu kapalı
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Saat dilimi
+      GF_DEFAULT_TIMEZONE: browser
+    volumes:
+      # Provisioning: datasource + dashboard otomatik yüklenir
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      # Persistent storage: dashboard düzenlemeleri kaybolmaz
+      - grafana_data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - prometheus
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+# ========================
+# Named Volumes
+# ========================
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+# ========================
+# Network
+# ========================
+networks:
+  flight_network:
+    driver: bridge

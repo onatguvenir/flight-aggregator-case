@@ -1,0 +1,51 @@
+# =====================================================================
+# Prometheus Scrape Konfigürasyonu
+# =====================================================================
+# Prometheus, bu config ile Flight Aggregator ve provider servislerinden
+# Micrometer metriklerini düzenli aralıklarla çeker.
+#
+# Spring Boot Actuator /actuator/prometheus endpoint'ini expose eder.
+# =====================================================================
+
+global:
+  # Her servis için varsayılan scrape aralığı
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+
+  # ----- Flight Aggregator (Ana uygulama) -----
+  - job_name: 'flight-aggregator'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['flight-aggregator:8080']
+    # Micrometer ek label'ları
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'flight-aggregator'
+
+  # ----- Flight Provider A (SOAP servis) -----
+  - job_name: 'flight-provider-a'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['flight-provider-a:8081']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'flight-provider-a'
+
+  # ----- Flight Provider B (SOAP servis) -----
+  - job_name: 'flight-provider-b'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['flight-provider-b:8082']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'flight-provider-b'
+
+  # ----- Prometheus kendisi -----
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

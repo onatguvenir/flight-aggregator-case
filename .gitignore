@@ -1,0 +1,91 @@
+# ============================================================
+# Flight Aggregator — .gitignore
+# ============================================================
+
+# ─── Maven ──────────────────────────────────────────────────
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ─── Spring Boot / Application ──────────────────────────────
+*.log
+*.log.*
+spring.log
+
+# ─── Environment Variables (GÜVENLİ: asla commit etme!) ─────
+# .env.local commit edilebilir (gerçek secret içermez)
+# .env.qa ve .env.prod ASLA commit edilmemeli
+.env.qa
+.env.prod
+# Gerçek secret içeren her .env override dosyası
+.env.*.local
+.env.override
+
+# ─── Docker ─────────────────────────────────────────────────
+# docker-compose override dosyaları (yerel overrides)
+docker-compose.override.yml
+docker-compose.local.yml
+
+# ─── JaCoCo Coverage Reports ────────────────────────────────
+jacoco*.exec
+jacoco*.xml
+jacoco-report/
+
+# ─── IDE: IntelliJ IDEA ─────────────────────────────────────
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# ─── IDE: Eclipse ───────────────────────────────────────────
+.classpath
+.project
+.settings/
+.factorypath
+bin/
+
+# ─── IDE: VS Code / Cursor ──────────────────────────────────
+.vscode/
+*.code-workspace
+
+# ─── IDE: NetBeans ──────────────────────────────────────────
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# ─── OS Generated ───────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ─── Grafana & Prometheus (runtime data) ────────────────────
+# Provisioning konfigürasyonları commit edilir,
+# runtime veri dizinleri edilmez
+grafana/data/
+prometheus/data/
+
+# ─── Testcontainers ─────────────────────────────────────────
+.testcontainers.properties
+
+# ─── Kubernetes & Secrets ───────────────────────────────────
+*.secret.yml
+*.secret.yaml
+kubeconfig
+*-secret.yml
+*-secret.yaml
+
+# ─── Geçici ve Yedek Dosyalar ───────────────────────────────
+*.tmp
+*.bak
+*.swp
+*.orig
+*~

@@ -1,0 +1,119 @@
+# =====================================================================
+# PROD Profile — Production Ortamı
+# =====================================================================
+# Kullanım:
+#   SPRING_PROFILES_ACTIVE=prod
+#   Tüm secret'lar Kubernetes Secrets / Vault / AWS SSM'den gelir
+#   .env.prod ASLA git'e committenmez!
+#
+# Felsefe: Güvenlik ve kararlılık öncelikli
+#   - WARN loglama (düşük I/O, kritik olaylar görünür)
+#   - Swagger KAPALI (API'yi dış dünyaya açma)
+#   - Sıkı Circuit Breaker (hızlı fail-fast)
+#   - Connection pool büyük (yüksek trafik)
+#   - Health details gizli (güvenlik)
+# =====================================================================
+
+spring:
+    datasource:
+        url: ${DB_URL}
+        username: ${DB_USER}
+        password: ${DB_PASSWORD}
+        hikari:
+            # Production'da daha büyük pool
+            maximum-pool-size: 20
+            minimum-idle: 5
+            idle-timeout: 600000 # 10 dakika
+            connection-timeout: 10000 # 10 saniye (prod'da hızlı fail-fast)
+            max-lifetime: 1800000 # 30 dakika bağlantı ömrü
+
+    data:
+        redis:
+            host: ${REDIS_HOST}
+            port: ${REDIS_PORT:6379}
+            password: ${REDIS_PASSWORD} # Prod'da şifre zorunlu!
+            lettuce:
+                pool:
+                    max-active: 20
+                    max-idle: 10
+                    min-idle: 2
+
+    jpa:
+        properties:
+            hibernate:
+                show_sql: false
+                format_sql: false
+
+# ---- Cache: Uzun TTL (SOAP çağrılarını minimize et) ----
+cache:
+    flight:
+        ttl-minutes: 15
+
+# ---- Providers ----
+providers:
+    a:
+        url: ${PROVIDER_A_URL}
+    b:
+        url: ${PROVIDER_B_URL}
+
+# ---- Resilience4j: Daha agresif koruma ----
+resilience4j:
+    circuitbreaker:
+        instances:
+            providerA:
+                sliding-window-size: 20 # Daha büyük pencere (gürültüyü filtrele)
+                failure-rate-threshold: 40 # %40'ta aç (production'da daha koruyucu)
+                wait-duration-in-open-state: 60s # 60s bekle (provider döngülerinini bekle)
+                permitted-number-of-calls-in-half-open-state: 5
+            providerB:
+                sliding-window-size: 20
+                failure-rate-threshold: 40
+                wait-duration-in-open-state: 60s
+                permitted-number-of-calls-in-half-open-state: 5
+    retry:
+        instances:
+            providerA:
+                max-attempts: 2 # Production'da fazla retry → provider yük artar
+                wait-duration: 1000ms
+            providerB:
+                max-attempts: 2
+                wait-duration: 1000ms
+    bulkhead:
+        instances:
+            providerA:
+                max-concurrent-calls: 20 # Production'da daha yüksek
+                max-wait-duration: 500ms # Hızlı fail (queue oluşturma)
+            providerB:
+                max-concurrent-calls: 20
+                max-wait-duration: 500ms
+
+# ---- Swagger: Production'da KAPALI (güvenlik) ----
+springdoc:
+    swagger-ui:
+        enabled: false
+    api-docs:
+        enabled: false
+
+# ---- Logging: Sadece WARN ve üzeri ----
+logging:
+    level:
+        com.technoly: WARN
+        org.springframework: WARN
+        io.github.resilience4j: WARN
+        org.flywaydb: WARN
+    # Production'da JSON formatında log (log aggregator için: ELK, Loki)
+    pattern:
+        console: '{"timestamp":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%level","logger":"%logger{36}","message":"%msg"}%n'
+
+# ---- Actuator: Production'da gizli tutulur ----
+management:
+    endpoint:
+        health:
+            show-details: never # Health details gizli
+    endpoints:
+        web:
+            exposure:
+                # Sadece iç alanda açık (API gateway arkasında olmalı)
+                include: health,prometheus
+    server:
+        port: 9090 # Actuator ayrı port — uygulama portu dışarıya açık, actuator değil

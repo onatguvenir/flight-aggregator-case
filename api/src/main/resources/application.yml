@@ -1,0 +1,178 @@
+# =====================================================================
+# BASE CONFIGURATION — tüm ortamlarda geçerli ortak ayarlar
+# Ortama özel değerler application-{profile}.yml'de tanımlanır.
+#
+# Profil belirleme:
+#   Local : SPRING_PROFILES_ACTIVE=local  (varsayılan)
+#   QA    : SPRING_PROFILES_ACTIVE=qa
+#   Prod  : SPRING_PROFILES_ACTIVE=prod
+# =====================================================================
+spring:
+  application:
+    name: flight-aggregator
+
+  # Aktif profil belirtilmezse 'local' kullan
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+  # ===========================
+  # PostgreSQL Datasource (Base)
+  # ===========================
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN:2}
+      idle-timeout: 30000
+      connection-timeout: 30000
+
+  # ===========================
+  # JPA / Hibernate (Base)
+  # ===========================
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        show_sql: false
+        format_sql: false
+    open-in-view: false
+
+  # ===========================
+  # Flyway (Base)
+  # ===========================
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  # ===========================
+  # Redis (Base)
+  # ===========================
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX:8}
+          max-idle: 8
+          min-idle: 0
+
+# ===========================
+# Cache
+# ===========================
+cache:
+  flight:
+    ttl-minutes: ${CACHE_TTL_MINUTES:5}
+
+# ===========================
+# SOAP Providers
+# ===========================
+providers:
+  a:
+    url: ${PROVIDER_A_URL}
+  b:
+    url: ${PROVIDER_B_URL}
+
+# ===========================
+# Server
+# ===========================
+server:
+  port: ${SERVER_PORT:8080}
+
+# ===========================
+# Actuator & Metrics (Base)
+# ===========================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: ${HEALTH_SHOW_DETAILS:always}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# ===========================
+# SpringDoc / Swagger
+# ===========================
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    doc-expansion: list
+    enabled: ${SWAGGER_ENABLED:true}
+  default-produces-media-type: application/json
+
+# ===========================
+# Resilience4j (Base)
+# ===========================
+resilience4j:
+  circuitbreaker:
+    instances:
+      providerA:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: ${CB_WINDOW_SIZE:10}
+        failure-rate-threshold: ${CB_FAILURE_THRESHOLD:50}
+        wait-duration-in-open-state: ${CB_WAIT_DURATION:30s}
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - org.springframework.ws.client.WebServiceClientException
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
+      providerB:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: ${CB_WINDOW_SIZE:10}
+        failure-rate-threshold: ${CB_FAILURE_THRESHOLD:50}
+        wait-duration-in-open-state: ${CB_WAIT_DURATION:30s}
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - org.springframework.ws.client.WebServiceClientException
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
+  retry:
+    instances:
+      providerA:
+        max-attempts: ${RETRY_MAX_ATTEMPTS:3}
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - org.springframework.ws.client.WebServiceClientException
+          - java.io.IOException
+      providerB:
+        max-attempts: ${RETRY_MAX_ATTEMPTS:3}
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - org.springframework.ws.client.WebServiceClientException
+          - java.io.IOException
+  bulkhead:
+    instances:
+      providerA:
+        max-concurrent-calls: ${BULKHEAD_MAX_CALLS:10}
+        max-wait-duration: 1s
+      providerB:
+        max-concurrent-calls: ${BULKHEAD_MAX_CALLS:10}
+        max-wait-duration: 1s
+
+# ===========================
+# Loglama (Base)
+# ===========================
+logging:
+  level:
+    com.technoly: ${LOG_LEVEL_APP:INFO}
+    org.springframework.ws: ${LOG_LEVEL_SPRING:WARN}
+    io.github.resilience4j: ${LOG_LEVEL_RESILIENCE:INFO}
+    org.flywaydb: INFO

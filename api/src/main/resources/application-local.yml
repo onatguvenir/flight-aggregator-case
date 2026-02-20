@@ -1,0 +1,86 @@
+# =====================================================================
+# LOCAL Profile — Geliştirici ortamı
+# =====================================================================
+# Kullanım:
+#   SPRING_PROFILES_ACTIVE=local  (varsayılan — belirtmesen de aktif olur)
+#   mvn spring-boot:run  (docker-compose db+redis ayakta olmalı)
+#
+# Felsefe: Developer experience öncelikli
+#   - Debug loglama açık (her SOAP çağrısı görünür)
+#   - Swagger UI aktif
+#   - Daha gevşek Circuit Breaker (geliştirici testleri CB'yi patlatmasın)
+# =====================================================================
+
+spring:
+    # ---- Datasource (local docker-compose defaults) ----
+    datasource:
+        url: jdbc:postgresql://localhost:5432/flightdb
+        username: flightuser
+        password: flightpass
+    hikari:
+        maximum-pool-size: 5
+        minimum-idle: 1
+
+    # ---- Redis ----
+    data:
+        redis:
+            host: localhost
+            port: 6379
+            password: ""
+
+    # ---- JPA: SQL'leri logla (sadece local'de) ----
+    jpa:
+        properties:
+            hibernate:
+                show_sql: true
+                format_sql: true
+
+# ---- Providers ----
+providers:
+    a:
+        url: http://localhost:8081/ws
+    b:
+        url: http://localhost:8082/ws
+
+# ---- Cache: Kısa TTL — geliştirici değişiklikleri hemen yansıtılır ----
+cache:
+    flight:
+        ttl-minutes: 1
+
+# ---- Resilience4j: Gevşek CB (local testlerde CB rahatsız etmesin) ----
+resilience4j:
+    circuitbreaker:
+        instances:
+            providerA:
+                failure-rate-threshold: 80
+                wait-duration-in-open-state: 10s
+            providerB:
+                failure-rate-threshold: 80
+                wait-duration-in-open-state: 10s
+    retry:
+        instances:
+            providerA:
+                max-attempts: 1 # Local'de retry beklemek yorucu
+            providerB:
+                max-attempts: 1
+
+# ---- Swagger: Local'de her zaman açık ----
+springdoc:
+    swagger-ui:
+        enabled: true
+
+# ---- Logging: DEBUG seviyede her şey görünür ----
+logging:
+    level:
+        com.technoly: DEBUG
+        org.springframework.ws: DEBUG
+        io.github.resilience4j: DEBUG
+        org.flywaydb: DEBUG
+        org.hibernate.SQL: DEBUG
+        org.hibernate.type.descriptor.sql: TRACE
+
+# ---- Actuator: Local'de tüm endpoint'ler açık ----
+management:
+    endpoint:
+        health:
+            show-details: always

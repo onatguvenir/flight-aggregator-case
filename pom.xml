@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        PARENT POM — Modular Monolithic Aggregator
+        ============================================
+        Bu POM, tüm modüllerin (domain, infrastructure, application, api)
+        ortak bağımlılık versiyonlarını ve build konfigürasyonunu yönetir.
+
+        Modüler Monolitik Mimari:
+        - Tek deployable artifact (api modülü)
+        - Net modüler sınırlar (her modül ayrı Maven projesi)
+        - Compile-time boundary enforcement (module-info.java değil, Maven dependency graph)
+        - Microservice'e geçiş için hazır yapı
+    -->
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.3</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.technoly</groupId>
+    <artifactId>flight-aggregator</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>Flight Aggregator - Parent</name>
+    <description>Modular Monolithic Flight Aggregator Application</description>
+
+    <!-- ========== MODÜLLER ========== -->
+    <!--
+        Maven modül sırası önemlidir: bağımlılık sırasına göre
+        (domain → infrastructure → application → api)
+    -->
+    <modules>
+        <module>domain</module>
+        <module>infrastructure</module>
+        <module>application</module>
+        <module>api</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Bağımlılık versiyonları — tek yerden yönetilir -->
+        <resilience4j.version>2.2.0</resilience4j.version>
+        <springdoc.version>2.3.0</springdoc.version>
+        <testcontainers.version>1.19.6</testcontainers.version>
+        <wiremock.version>3.4.2</wiremock.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <!--
+            annotationProcessorPaths içinde versiyonlar dependency yönetiminden gelmiyor.
+            Bu yüzden Lombok versiyonunu burada açıkça belirtmek zorundayız.
+            Spring Boot 3.2.3 → Lombok 1.18.30
+        -->
+        <lombok.version>1.18.30</lombok.version>
+    </properties>
+
+    <!-- ========== BAĞIMLILIK YÖNETİMİ ========== -->
+    <!--
+        dependencyManagement: Alt modüller bu versiyonları inherit eder.
+        Her alt modül <version> belirtmeksizin bu bağımlılıkları kullanabilir.
+        Bu, "diamond dependency" sorununu önler ve versiyon tutarlılığını sağlar.
+    -->
+    <dependencyManagement>
+        <dependencies>
+
+            <!-- ===== KENDİ MODÜLLERİMİZ ===== -->
+            <dependency>
+                <groupId>com.technoly</groupId>
+                <artifactId>domain</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.technoly</groupId>
+                <artifactId>infrastructure</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.technoly</groupId>
+                <artifactId>application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- ===== RESILIENCE4J ===== -->
+            <!--
+                resilience4j-bom: Bill of Materials.
+                Tüm Resilience4j modüllerinin versiyonunu tek yerden yönetir. type=pom, scope=import ile diğer BOM'lar gibi kullanılır.
+            -->
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-bom</artifactId>
+                <version>${resilience4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ===== FLYWAY POSTGRESQL EXTENSION (Flyway 10+) ===== -->
+            <!--
+                flyway-database-postgresql: Flyway 10'da PostgreSQL desteği ayrı modüle taşındı.
+                Spring Boot BOM'u flyway-core'u yönetir ancak bu extension modülünü yönetmez.
+                Versiyon, Spring Boot 3.2.3'ün kullandığı flyway-core versiyonu ile eşleşmeli.
+            -->
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-database-postgresql</artifactId>
+                <version>10.7.2</version>
+            </dependency>
+
+            <!-- ===== TESTCONTAINERS ===== -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ===== SPRINGDOC (Swagger UI) ===== -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- ===== MAPSTRUCT ===== -->
+            <!--
+                MapStruct: Compile-time type-safe DTO↔Entity mapper.
+                Reflection yerine generated code kullandığı için performanslı.
+            -->
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+
+            <!-- ===== WIREMOCK ===== -->
+            <dependency>
+                <groupId>org.wiremock</groupId>
+                <artifactId>wiremock-standalone</artifactId>
+                <version>${wiremock.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- ========== TÜM MODÜLLERDE ORTAK BAĞIMLILIKLAR ========== -->
+    <dependencies>
+        <!-- Lombok: Boilerplate kodu azaltır (@Slf4j, @RequiredArgsConstructor vs) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- Test: JUnit 5 base -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <source>17</source>
+                        <target>17</target>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                            <path>
+                                <groupId>org.mapstruct</groupId>
+                                <artifactId>mapstruct-processor</artifactId>
+                                <version>${mapstruct.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+
+                <!--
+                    JaCoCo Maven Plugin: Test coverage ölçümü ve raporlama.
+                    Kullanım:
+                      mvn clean verify  → testleri çalıştır + coverage raporla + threshold kontrol et
+                      mvn jacoco:report → sadece rapor oluştur (target/site/jacoco/index.html)
+
+                    prepare-agent goal: JVM'e jacoco agent ekler (bytecode instrumentation)
+                    report goal: HTML/XML/CSV rapor oluşturur
+                    check goal: Minimum threshold altında ise build FAIL eder
+
+                    Hariç tutulanlar (excludes):
+                    - **/model/**: Lombok @Data sınıfları (getter/setter test gerekmiyor)
+                    - **/config/**: Spring config sınıfları (Spring Boot context testleri kapsar)
+                    - **/*Application.java: Main sınıf
+                    - **/soap/**: JAXB generated wrapper POJO'lar
+                -->
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>0.8.11</version>
+                    <configuration>
+                        <excludes>
+                            <exclude>**/model/**</exclude>
+                            <exclude>**/config/**</exclude>
+                            <exclude>**/*Application.java</exclude>
+                            <exclude>**/soap/**</exclude>
+                            <exclude>**/persistence/entity/**</exclude>
+                        </excludes>
+                    </configuration>
+                    <executions>
+                        <!-- Adım 1: JVM agent'ı hazırla (test öncesi) -->
+                        <execution>
+                            <id>prepare-agent</id>
+                            <goals>
+                                <goal>prepare-agent</goal>
+                            </goals>
+                        </execution>
+                        <!-- Adım 2: HTML rapor üret (test sonrası) -->
+                        <execution>
+                            <id>report</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>report</goal>
+                            </goals>
+                        </execution>
+                        <!--
+                            Adım 3: Minimum threshold kontrolü.
+                            LINE coverage %80 altında ise build FAIL eder.
+                            Bu CI/CD pipeline'da kalite kapısı (quality gate) işlevi görür.
+                        -->
+                        <execution>
+                            <id>check</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                            <configuration>
+                                <rules>
+                                    <rule>
+                                        <element>BUNDLE</element>
+                                        <limits>
+                                            <limit>
+                                                <counter>LINE</counter>
+                                                <value>COVEREDRATIO</value>
+                                                <minimum>0.80</minimum>
+                                            </limit>
+                                            <limit>
+                                                <counter>BRANCH</counter>
+                                                <value>COVEREDRATIO</value>
+                                                <minimum>0.75</minimum>
+                                            </limit>
+                                        </limits>
+                                    </rule>
+                                </rules>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <!-- JaCoCo tüm alt modüllerde otomatik aktif -->
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

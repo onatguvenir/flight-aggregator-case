@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.technoly</groupId>
+        <artifactId>flight-aggregator</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>domain</artifactId>
+    <name>Flight Aggregator - Domain</name>
+
+    <!--
+        DOMAIN MODÜLÜ
+        ===============
+        Clean Architecture'da domain katmanı:
+        - Dış dünyadan (Spring, DB, HTTP) bağımsız saf Java sınıfları
+        - Diğer modüllerin "dil"ini tanımlar (FlightDto, SearchRequest, port interfaces)
+        - Hiçbir framework dependency'si OLMAMALI
+        - Bu modül hem infrastructure hem application hem de api modülüne bağımlıdır
+
+        Burada istisnai olarak Bean Validation ekliyoruz çünkü
+        @NotNull, @NotBlank gibi standard constraint annotation'lar
+        domain modelinin bir parçasıdır.
+    -->
+    <dependencies>
+        <!-- Bean Validation: @NotNull, @NotBlank, @Future annotation'ları için -->
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+        <!-- Jackson: FlightDto JSON serialization için (log json'ları) -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+    </dependencies>
+</project>
