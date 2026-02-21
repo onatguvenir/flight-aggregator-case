@@ -3,6 +3,7 @@ package com.technoly.infrastructure.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -67,7 +68,7 @@ public class RedisConfig {
                                 .fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(
                         RedisSerializationContext.SerializationPair
-                                .fromSerializer(new GenericJackson2JsonRedisSerializer(objectMapper())))
+                                .fromSerializer(new GenericJackson2JsonRedisSerializer(redisObjectMapper())))
                 .disableCachingNullValues();
 
         return RedisCacheManager.builder(connectionFactory)
@@ -87,24 +88,26 @@ public class RedisConfig {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
         template.setKeySerializer(new StringRedisSerializer());
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer(objectMapper()));
+        template.setValueSerializer(new GenericJackson2JsonRedisSerializer(redisObjectMapper()));
         template.setHashKeySerializer(new StringRedisSerializer());
-        template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer(objectMapper()));
+        template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer(redisObjectMapper()));
         template.afterPropertiesSet();
         return template;
     }
 
     /**
-     * Jackson ObjectMapper: Redis'te JSON serialization için.
-     * JavaTimeModule: LocalDateTime gibi Java 8 tarih tiplerini destekler.
-     * WRITE_DATES_AS_TIMESTAMPS false: ISO 8601 string format kullanır
-     * (okunabilirlik)
+     * Jackson ObjectMapper: Sadece Redis'te JSON serialization için özel nesne.
+     * 
+     * @Bean yapmıyoruz çünkü @Bean yaparsak Spring Web'in genel ObjectMapper'ını
+     *       ezer ve API yanıtlarında Java sınıf isimleri sızar.
      */
-    @Bean
-    public ObjectMapper objectMapper() {
+    private ObjectMapper redisObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+        mapper.activateDefaultTyping(
+                BasicPolymorphicTypeValidator.builder().allowIfBaseType(Object.class).build(),
+                ObjectMapper.DefaultTyping.NON_FINAL);
         return mapper;
     }
 }

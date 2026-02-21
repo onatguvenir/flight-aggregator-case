@@ -3,6 +3,8 @@ package com.technoly.api;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 /**
  * Flight Aggregator - Ana Uygulama Sınıfı
@@ -36,6 +38,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
         "com.technoly.infrastructure",
         "com.technoly.domain"
 })
+@EnableJpaRepositories(basePackages = "com.technoly.infrastructure.persistence.repository")
+@EntityScan(basePackages = "com.technoly.infrastructure.persistence.entity")
 @EnableAsync
 public class FlightAggregatorApplication {
 

@@ -68,60 +68,15 @@ services:
       - flight_network
     restart: unless-stopped
 
-  # ========================
-  # Flight Provider A (SOAP :8081)
-  # ========================
-  flight-provider-a:
-    build:
-      context: ../flightproviderA
-      dockerfile: Dockerfile
-    container_name: flight_provider_a
-    ports:
-      - "8081:8081"
-    environment:
-      SERVER_PORT: 8081
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8081/actuator/health || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      # Maven build içinde: start_period yüksek tutulur
-      start_period: 120s
-    networks:
-      - flight_network
-    restart: unless-stopped
 
-  # ========================
-  # Flight Provider B (SOAP :8082)
-  # ========================
-  flight-provider-b:
-    build:
-      context: ../flightproviderB
-      dockerfile: Dockerfile
-    container_name: flight_provider_b
-    ports:
-      - "8082:8082"
-    environment:
-      SERVER_PORT: 8082
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8082/actuator/health || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
-    networks:
-      - flight_network
-    restart: unless-stopped
 
   # ========================
   # Flight Aggregator (REST :8080)
   # ========================
   flight-aggregator:
     build:
-      context: ./
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: flight-aggregator/Dockerfile
     container_name: flight_aggregator
     ports:
       - "8080:8080"
@@ -143,10 +98,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      flight-provider-a:
-        condition: service_healthy
-      flight-provider-b:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]

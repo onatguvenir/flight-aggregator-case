@@ -7,26 +7,19 @@ FROM maven:3.9.6-eclipse-temurin-17-alpine AS builder
 
 WORKDIR /app
 
-# Modüler yapı: her modülün pom.xml'ini ayrı kopyala
-# (Docker layer caching: kaynak değişince sadece o katman yeniden build edilir)
-COPY pom.xml .
-COPY domain/pom.xml domain/
-COPY infrastructure/pom.xml infrastructure/
-COPY application/pom.xml application/
-COPY api/pom.xml api/
+# Provider A bağımlılığını kopyala ve local m2 repository'sine yükle
+COPY FlightProviderA FlightProviderA
+RUN mvn -f FlightProviderA/pom.xml clean install -DskipTests
 
-# Bağımlılıkları önden indir → sonraki build'lerde bu katman cache'den gelir
-RUN mvn dependency:go-offline -q
+# Provider B bağımlılığını kopyala ve local m2 repository'sine yükle
+COPY FlightProviderB FlightProviderB
+RUN mvn -f FlightProviderB/pom.xml clean install -DskipTests
 
-# Kaynak kodları kopyala
-COPY domain/src domain/src
-COPY infrastructure/src infrastructure/src
-COPY application/src application/src
-COPY api/src api/src
+# Aggregator projesinin tamamını kopyala
+COPY flight-aggregator flight-aggregator
 
-# Sadece api modülünü ve bağımlılıklarını (-am) paketle
-# DskipTests: build sırasında DB/Redis yoktur
-RUN mvn clean package -DskipTests -pl api -am -q
+# Aggregator'ı derle (Provider A ve B local repository'de yüklü olduğu için hata vermeden derlenecek)
+RUN mvn -f flight-aggregator/pom.xml clean package -DskipTests
 
 # =====================================================================
 # Stage 2: Runtime — JRE 17 minimal
@@ -41,7 +34,7 @@ RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring
 
 WORKDIR /app
-COPY --from=builder /app/api/target/api-*.jar app.jar
+COPY --from=builder /app/flight-aggregator/api/target/api-*.jar app.jar
 
 EXPOSE 8080
 

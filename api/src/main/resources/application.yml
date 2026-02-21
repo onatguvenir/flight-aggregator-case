@@ -127,7 +127,7 @@ resilience4j:
         wait-duration-in-open-state: ${CB_WAIT_DURATION:30s}
         permitted-number-of-calls-in-half-open-state: 3
         record-exceptions:
-          - org.springframework.ws.client.WebServiceClientException
+          - java.lang.Exception
           - java.util.concurrent.TimeoutException
           - java.io.IOException
       providerB:
@@ -137,7 +137,7 @@ resilience4j:
         wait-duration-in-open-state: ${CB_WAIT_DURATION:30s}
         permitted-number-of-calls-in-half-open-state: 3
         record-exceptions:
-          - org.springframework.ws.client.WebServiceClientException
+          - java.lang.Exception
           - java.util.concurrent.TimeoutException
           - java.io.IOException
   retry:
@@ -148,7 +148,7 @@ resilience4j:
         enable-exponential-backoff: true
         exponential-backoff-multiplier: 2
         retry-exceptions:
-          - org.springframework.ws.client.WebServiceClientException
+          - java.lang.Exception
           - java.io.IOException
       providerB:
         max-attempts: ${RETRY_MAX_ATTEMPTS:3}
@@ -156,7 +156,7 @@ resilience4j:
         enable-exponential-backoff: true
         exponential-backoff-multiplier: 2
         retry-exceptions:
-          - org.springframework.ws.client.WebServiceClientException
+          - java.lang.Exception
           - java.io.IOException
   bulkhead:
     instances:

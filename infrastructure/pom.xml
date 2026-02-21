@@ -16,11 +16,14 @@
         INFRASTRUCTURE MODÜLÜ
         =======================
         Bu modül, dış sistemlerle iletişimi yönetir:
-        - SOAP clients (Spring-WS WebServiceTemplate)
+        - FlightProviderA ve FlightProviderB (lokal JAR kütüphane — doğrudan Java method call)
         - JPA repositories (PostgreSQL)
         - Redis cache
         - Flyway migrations
         - Resilience4j konfigürasyonu
+
+        NOT: Provider'lar Spring Boot/HTTP servisi değil, plain Java kütüphanesidir.
+        Bu nedenle Spring-WS/JAXB kullanılmaz; SearchService doğrudan instantiate edilir.
     -->
     <dependencies>
         <!-- Domain modülüne bağımlı: port interface'leri ve DTO'ları kullanır -->
@@ -35,21 +38,26 @@
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
 
-        <!-- Spring-WS: SOAP client (WebServiceTemplate) için -->
+        <!--
+            FlightProviderA — plain Java kütüphane bağımlılığı.
+            Bu JAR, `mvn install` ile FlightProviderA dizininden lokal repo'ya kurulmuştur.
+            Gerçek projede Nexus/Artifactory gibi artifact reposunda barındırılır.
+        -->
         <dependency>
-            <groupId>org.springframework.ws</groupId>
-            <artifactId>spring-ws-core</artifactId>
+            <groupId>com.flightprovidera</groupId>
+            <artifactId>flight-provider-a</artifactId>
+            <version>1.0.0</version>
         </dependency>
 
-        <!-- JAXB: SOAP XML mesajlarını Java'ya/Java'dan çevirmek için -->
+        <!--
+            FlightProviderB — plain Java kütüphane bağımlılığı.
+            ProviderB'de alan adları farklı: departure/arrival (origin/destination değil).
+            Bu farkı client adapter katmanında (FlightProviderBClient) kapatıyoruz.
+        -->
         <dependency>
-            <groupId>jakarta.xml.bind</groupId>
-            <artifactId>jakarta.xml.bind-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.sun.xml.bind</groupId>
-            <artifactId>jaxb-impl</artifactId>
-            <version>4.0.4</version>
+            <groupId>com.flightproviderb</groupId>
+            <artifactId>flight-provider-b</artifactId>
+            <version>1.0.0</version>
         </dependency>
 
         <!-- JPA + Hibernate: PostgreSQL entity mapping -->

@@ -82,6 +82,25 @@ public class ApiLogService {
     }
 
     /**
+     * Tüm logları listeler.
+     * 
+     * @return Log nesneleri listesi
+     */
+    public java.util.List<ApiLogEntity> getAllLogs() {
+        return apiLogRepository.findAll();
+    }
+
+    /**
+     * Belirli bir endpoint için logları listeler.
+     * 
+     * @param endpoint Aranacak endpoint regex veya string
+     * @return Log nesneleri listesi
+     */
+    public java.util.List<ApiLogEntity> getLogsByEndpoint(String endpoint) {
+        return apiLogRepository.findByEndpoint(endpoint);
+    }
+
+    /**
      * Nesneyi JSON string'e çevirir.
      * Null-safe: null input → "null" string döner
      */
