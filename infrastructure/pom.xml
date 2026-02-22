@@ -43,21 +43,12 @@
             Bu JAR, `mvn install` ile FlightProviderA dizininden lokal repo'ya kurulmuştur.
             Gerçek projede Nexus/Artifactory gibi artifact reposunda barındırılır.
         -->
-        <dependency>
-            <groupId>com.flightprovidera</groupId>
-            <artifactId>flight-provider-a</artifactId>
-            <version>1.0.0</version>
-        </dependency>
-
         <!--
-            FlightProviderB — plain Java kütüphane bağımlılığı.
-            ProviderB'de alan adları farklı: departure/arrival (origin/destination değil).
-            Bu farkı client adapter katmanında (FlightProviderBClient) kapatıyoruz.
+            SOAP Web Services Client
         -->
         <dependency>
-            <groupId>com.flightproviderb</groupId>
-            <artifactId>flight-provider-b</artifactId>
-            <version>1.0.0</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web-services</artifactId>
         </dependency>
 
         <!-- JPA + Hibernate: PostgreSQL entity mapping -->
@@ -130,4 +121,30 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <!-- JAXB Plugin to generate Java classes from XSD for the SOAP Client -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>jaxb2-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>xjc</id>
+                        <goals>
+                            <goal>xjc</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <sources>
+                        <source>src/main/resources/wsdl/flights.xsd</source>
+                    </sources>
+                    <outputDirectory>src/main/java</outputDirectory>
+                    <clearOutputDir>false</clearOutputDir>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

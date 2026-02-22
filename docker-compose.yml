@@ -73,6 +73,38 @@ services:
 
 
   # ========================
+  # FlightProvider A (SOAP :8081)
+  # ========================
+  flight-provider-a:
+    build:
+      context: ../FlightProviderA
+      dockerfile: Dockerfile
+    container_name: flight_provider_a
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
+  # FlightProvider B (SOAP :8082)
+  # ========================
+  flight-provider-b:
+    build:
+      context: ../FlightProviderB
+      dockerfile: Dockerfile
+    container_name: flight_provider_b
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
   # Flight Aggregator (REST :8080)
   # ========================
   flight-aggregator:
@@ -112,6 +144,10 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      flight-provider-a:
+        condition: service_started
+      flight-provider-b:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
       interval: 15s

@@ -1,8 +1,8 @@
 package com.technoly.infrastructure.client;
 
-import com.flightproviderb.service.SearchRequest;
-import com.flightproviderb.service.SearchResult;
-import com.flightproviderb.service.SearchService;
+import com.flightprovider.wsdl.Flight;
+import com.flightprovider.wsdl.SearchRequest;
+import com.flightprovider.wsdl.SearchResult;
 import com.technoly.domain.model.FlightDto;
 import com.technoly.domain.model.FlightSearchRequest;
 import com.technoly.domain.port.FlightProviderPort;
@@ -14,20 +14,18 @@ import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.springframework.ws.client.core.WebServiceTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * FlightProvider B — Java Kütüphane Adaptörü
- *
- * ProviderA ile aynı mimari, temel farklar Anti-Corruption layer mantığında
- * barınır.
- * Spring DI kullanarak SearchService ve MeterRegistry (Micrometer
- * Observability) bağımlılıklarını yönetiriz (SOLID - DIP).
+ * FlightProvider B — SOAP Web Service Client
  */
 @Slf4j
 @Component
@@ -35,20 +33,13 @@ public class FlightProviderBClient implements FlightProviderPort {
 
     private static final String PROVIDER_NAME = "PROVIDER_B";
 
-    private final SearchService searchService;
+    private final WebServiceTemplate webServiceTemplate;
     private final MeterRegistry meterRegistry;
 
-    /**
-     * Constructor Injection
-     * 
-     * @param searchService Provider'a özel state-less kütüphane servisi (@Qualifier
-     *                      ile ayırt edilir)
-     * @param meterRegistry Metrik toplama
-     */
     public FlightProviderBClient(
-            @Qualifier("providerBSearchService") SearchService searchService,
+            @Qualifier("webServiceTemplateB") WebServiceTemplate webServiceTemplate,
             MeterRegistry meterRegistry) {
-        this.searchService = searchService;
+        this.webServiceTemplate = webServiceTemplate;
         this.meterRegistry = meterRegistry;
     }
 
@@ -57,18 +48,16 @@ public class FlightProviderBClient implements FlightProviderPort {
     @Retry(name = "providerB")
     @Bulkhead(name = "providerB", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "fallbackSearchFlights")
     public List<FlightDto> searchFlights(FlightSearchRequest request) {
-        log.info("[ProviderB] Uçuş araması: {} → {} @ {}",
+        log.info("[ProviderB] Uçuş araması (SOAP): {} → {} @ {}",
                 request.getOrigin(), request.getDestination(), request.getDepartureDate());
 
-        // Anti-Corruption Layer: origin→departure, destination→arrival
         SearchRequest providerRequest = buildProviderRequest(request);
 
-        // Metrik tayini
         Timer.Sample sample = Timer.start(meterRegistry);
 
         SearchResult result;
         try {
-            result = searchService.availabilitySearch(providerRequest);
+            result = (SearchResult) webServiceTemplate.marshalSendAndReceive(providerRequest);
         } finally {
             sample.stop(meterRegistry.timer("flight.search.provider.latency", "provider", PROVIDER_NAME));
         }
@@ -76,10 +65,6 @@ public class FlightProviderBClient implements FlightProviderPort {
         return mapToFlightDtos(result);
     }
 
-    /**
-     * Fallback: Tüm retry'lar tükendikten sonra veya circuit açıkken çağrılır.
-     * Null Object Pattern kullanıldı.
-     */
     public List<FlightDto> fallbackSearchFlights(FlightSearchRequest request, Throwable throwable) {
         log.warn("[ProviderB] Fallback devrede. Hata: {}", throwable.getMessage());
         return new ArrayList<>();
@@ -91,10 +76,11 @@ public class FlightProviderBClient implements FlightProviderPort {
     }
 
     private SearchRequest buildProviderRequest(FlightSearchRequest request) {
-        return new SearchRequest(
-                request.getOrigin(),
-                request.getDestination(),
-                request.getDepartureDate());
+        SearchRequest req = new SearchRequest();
+        req.setOrigin(request.getOrigin());
+        req.setDestination(request.getDestination());
+        req.setDepartureDate(request.getDepartureDate().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        return req;
     }
 
     private List<FlightDto> mapToFlightDtos(SearchResult result) {
@@ -108,15 +94,15 @@ public class FlightProviderBClient implements FlightProviderPort {
             return new ArrayList<>();
         }
 
-        return Optional.ofNullable(result.getFlightOptions())
-                .orElse(new ArrayList<>())
-                .stream()
+        return result.getFlights().stream()
                 .map(flight -> FlightDto.builder()
                         .flightNumber(flight.getFlightNumber())
-                        .origin(flight.getDeparture()) // Anti-Corruption
-                        .destination(flight.getArrival()) // Anti-Corruption
-                        .departureDateTime(flight.getDeparturedatetime())
-                        .arrivalDateTime(flight.getArrivaldatetime())
+                        .origin(flight.getOrigin())
+                        .destination(flight.getDestination())
+                        .departureDateTime(
+                                LocalDateTime.parse(flight.getDepartureTime(), DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                        .arrivalDateTime(
+                                LocalDateTime.parse(flight.getArrivalTime(), DateTimeFormatter.ISO_LOCAL_DATE_TIME))
                         .price(Optional.ofNullable(flight.getPrice()).orElse(BigDecimal.ZERO))
                         .provider(PROVIDER_NAME)
                         .build())

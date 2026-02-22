@@ -55,6 +55,12 @@ class SystemIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @org.springframework.boot.test.mock.mockito.MockBean(name = "webServiceTemplateA")
+    private org.springframework.ws.client.core.WebServiceTemplate webServiceTemplateA;
+
+    @org.springframework.boot.test.mock.mockito.MockBean(name = "webServiceTemplateB")
+    private org.springframework.ws.client.core.WebServiceTemplate webServiceTemplateB;
+
     private static final String ORIGIN = "IST";
     private static final String DESTINATION = "LHR";
     private static final String DEPARTURE_DATE = "2026-06-01T10:00:00";
@@ -62,6 +68,36 @@ class SystemIntegrationTest {
     @BeforeEach
     void verifyAndLog() {
         System.out.println(">>> Localhost üzerindeki aktif PostgreSQL ve Redis docker container'larına bağlanıldı...");
+
+        // Mock Provider A
+        com.flightprovider.wsdl.SearchResult resultA = new com.flightprovider.wsdl.SearchResult();
+        resultA.setHasError(false);
+        com.flightprovider.wsdl.Flight flightA = new com.flightprovider.wsdl.Flight();
+        flightA.setFlightNumber("A123");
+        flightA.setOrigin("IST");
+        flightA.setDestination("LHR");
+        flightA.setDepartureTime("2026-06-01T10:00:00");
+        flightA.setArrivalTime("2026-06-01T14:00:00");
+        flightA.setPrice(new java.math.BigDecimal("150.00"));
+        resultA.getFlights().add(flightA);
+        org.mockito.Mockito.lenient()
+                .when(webServiceTemplateA.marshalSendAndReceive(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(resultA);
+
+        // Mock Provider B
+        com.flightprovider.wsdl.SearchResult resultB = new com.flightprovider.wsdl.SearchResult();
+        resultB.setHasError(false);
+        com.flightprovider.wsdl.Flight flightB = new com.flightprovider.wsdl.Flight();
+        flightB.setFlightNumber("B456");
+        flightB.setOrigin("IST");
+        flightB.setDestination("LHR");
+        flightB.setDepartureTime("2026-06-01T10:00:00");
+        flightB.setArrivalTime("2026-06-01T14:00:00");
+        flightB.setPrice(new java.math.BigDecimal("120.00"));
+        resultB.getFlights().add(flightB);
+        org.mockito.Mockito.lenient()
+                .when(webServiceTemplateB.marshalSendAndReceive(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(resultB);
     }
 
     // =====================================================================
