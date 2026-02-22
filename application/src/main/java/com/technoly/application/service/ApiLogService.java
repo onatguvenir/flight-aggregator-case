@@ -6,26 +6,26 @@ import com.technoly.infrastructure.persistence.entity.ApiLogEntity;
 import com.technoly.infrastructure.persistence.repository.ApiLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
  * API Log Servisi
  *
- * Her REST API isteğini ve yanıtını asenkron olarak PostgreSQL'e kaydeder.
+ * Her REST API isteğini ve yanıtını asenkron olarak PostgreSQL'e kaydeder
+ * ve listeleme işlemlerini sayfalı biçimde sunar.
  *
- * Neden @Async?
- * DB yazma işlemi, HTTP response süresini etkilememeli.
- * 
+ * Pagination Neden Zorunlu?
+ * api_logs tablosu üretim ortamında milyonlarca kayıt içerebilir.
+ * findAll() → tüm satırları belleğe çekmek → OOM (Out of Memory) hatası.
+ * findAll(Pageable) → yalnızca istenen sayfayı getirir → hafızadan tasarruf.
+ *
  * @Async ile bu iş arka plan thread'inde yapılır, kullanıcı yanıtı beklemez.
- *        Örneğin: SOAP çağrısı 200ms + Log yazma 20ms = 220ms olmak yerine
- *        SOAP çağrısı 200ms (log parallel) = 200ms olur.
- *
- *        Neden @Transactional?
- *        DB yazma atomik olmalı. Hata durumunda rollback yapılır.
- *        propagation=REQUIRES_NEW: Çağıran transaction'dan bağımsız çalışır.
- *        (Çağıran transaction başarısız olsa bile log yazılır)
  */
 @Slf4j
 @Service
@@ -44,9 +44,6 @@ public class ApiLogService {
      *
      * @Transactional: REQUIRES_NEW ile bağımsız transaction.
      *                 → Çağıran başarısız olsa da log yazılır.
-     *
-     *                 Defensive programming: JSON dönüşüm hataları yakalanır,
-     *                 log işlemi hiçbir zaman ana akışı bozmamalıdır.
      *
      * @param endpoint   Çağrılan endpoint: "/api/v1/flights/search"
      * @param request    Request nesnesi (JSON'a çevrilecek)
@@ -81,28 +78,62 @@ public class ApiLogService {
         }
     }
 
+    // =====================================================================
+    // Paginated Query Methods (Production-Safe)
+    // =====================================================================
+
     /**
-     * Tüm logları listeler.
-     * 
-     * @return Log nesneleri listesi
+     * Tüm logları sayfalı olarak listeler.
+     *
+     * Örnek kullanım: Pageable.of(0, 20, Sort.by("createdAt").descending())
+     *
+     * @param pageable Sayfa numarası, boyut ve sıralama bilgisi
+     * @return Sayfalı log nesneleri
      */
-    public java.util.List<ApiLogEntity> getAllLogs() {
+    public Page<ApiLogEntity> getAllLogs(Pageable pageable) {
+        return apiLogRepository.findAll(pageable);
+    }
+
+    /**
+     * Belirli bir endpoint için sayfalı logları listeler.
+     *
+     * @param endpoint Aranacak endpoint path'i (örn: /api/v1/flights/search)
+     * @param pageable Sayfa numarası, boyut ve sıralama bilgisi
+     * @return Sayfalı log nesneleri
+     */
+    public Page<ApiLogEntity> getLogsByEndpoint(String endpoint, Pageable pageable) {
+        return apiLogRepository.findByEndpoint(endpoint, pageable);
+    }
+
+    // =====================================================================
+    // Legacy (Backward Compatible) — Pagination olmadan tüm veri
+    // =====================================================================
+
+    /**
+     * Tüm logları listeler (sayfalama olmadan).
+     * 
+     * @deprecated Üretim ortamında OOM riske yol açar; getAllLogs(Pageable)
+     *             kullanın.
+     */
+    @Deprecated(since = "2.0", forRemoval = false)
+    public List<ApiLogEntity> getAllLogs() {
         return apiLogRepository.findAll();
     }
 
     /**
-     * Belirli bir endpoint için logları listeler.
+     * Belirli bir endpoint için tüm logları listeler (sayfalama olmadan).
      * 
-     * @param endpoint Aranacak endpoint regex veya string
-     * @return Log nesneleri listesi
+     * @deprecated Üretim ortamında OOM riske yol açar; getLogsByEndpoint(String,
+     *             Pageable) kullanın.
      */
-    public java.util.List<ApiLogEntity> getLogsByEndpoint(String endpoint) {
+    @Deprecated(since = "2.0", forRemoval = false)
+    public List<ApiLogEntity> getLogsByEndpoint(String endpoint) {
         return apiLogRepository.findByEndpoint(endpoint);
     }
 
     /**
      * Nesneyi JSON string'e çevirir.
-     * Null-safe: null input → "null" string döner
+     * Null-safe: null input → "null" string döner.
      */
     private String toJson(Object obj) {
         if (obj == null)

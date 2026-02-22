@@ -7,6 +7,7 @@ import com.technoly.domain.model.FlightDto;
 import com.technoly.domain.model.FlightSearchRequest;
 import com.technoly.domain.port.FlightProviderPort;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -54,6 +55,7 @@ public class FlightProviderBClient implements FlightProviderPort {
     @Override
     @CircuitBreaker(name = "providerB", fallbackMethod = "fallbackSearchFlights")
     @Retry(name = "providerB")
+    @Bulkhead(name = "providerB", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "fallbackSearchFlights")
     public List<FlightDto> searchFlights(FlightSearchRequest request) {
         log.info("[ProviderB] Uçuş araması: {} → {} @ {}",
                 request.getOrigin(), request.getDestination(), request.getDepartureDate());

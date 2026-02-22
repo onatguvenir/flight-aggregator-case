@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -37,6 +39,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *            - Validation çalışıyor mu?
  */
 @WebMvcTest(FlightSearchController.class)
+@TestPropertySource(properties = {
+        "security.enabled=false",
+        "spring.security.oauth2.resourceserver.jwt.issuer-uri=",
+        "rate-limit.capacity=60",
+        "rate-limit.refill-per-minute=60"
+})
 @DisplayName("FlightSearchController Unit Testleri")
 class FlightSearchControllerTest {
 
@@ -71,6 +79,7 @@ class FlightSearchControllerTest {
     // =============================================
 
     @Test
+    @WithMockUser
     @DisplayName("search: zorunlu parametrelerle 200 OK döner")
     void search_validParams_returns200() throws Exception {
         when(flightAggregatorService.searchAllFlights(any())).thenReturn(List.of(sampleFlight()));
@@ -89,6 +98,7 @@ class FlightSearchControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("search: priceMin/priceMax filtreleri ile 200 OK döner")
     void search_withPriceFilters_returns200() throws Exception {
         when(flightAggregatorService.searchAllFlights(any())).thenReturn(List.of(sampleFlight()));
@@ -104,6 +114,7 @@ class FlightSearchControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("search: tarih aralığı filtreleri ile 200 OK döner")
     void search_withDateFilters_returns200() throws Exception {
         when(flightAggregatorService.searchAllFlights(any())).thenReturn(List.of(sampleFlight()));
@@ -120,6 +131,7 @@ class FlightSearchControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("search: origin eksik → 400 Bad Request")
     void search_missingOrigin_returns400() throws Exception {
         mockMvc.perform(get("/api/v1/flights/search")
@@ -129,6 +141,7 @@ class FlightSearchControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("search: destination eksik → 400 Bad Request")
     void search_missingDestination_returns400() throws Exception {
         mockMvc.perform(get("/api/v1/flights/search")
@@ -138,6 +151,7 @@ class FlightSearchControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("search: departureDate eksik → 400 Bad Request")
     void search_missingDepartureDate_returns400() throws Exception {
         mockMvc.perform(get("/api/v1/flights/search")
@@ -147,6 +161,7 @@ class FlightSearchControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("search: geçersiz tarih formatı → 400 Bad Request")
     void search_invalidDateFormat_returns400() throws Exception {
         mockMvc.perform(get("/api/v1/flights/search")
@@ -157,6 +172,7 @@ class FlightSearchControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("search: sonuç boş → 200 OK, boş liste")
     void search_noResults_returns200WithEmptyList() throws Exception {
         when(flightAggregatorService.searchAllFlights(any())).thenReturn(List.of());
@@ -175,6 +191,7 @@ class FlightSearchControllerTest {
     // =============================================
 
     @Test
+    @WithMockUser
     @DisplayName("cheapest: zorunlu parametrelerle 200 OK döner")
     void cheapest_validParams_returns200() throws Exception {
         when(cheapestFlightService.findCheapestFlights(any())).thenReturn(List.of(sampleFlight()));
@@ -189,6 +206,7 @@ class FlightSearchControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("cheapest: tüm filtreler ile 200 OK döner")
     void cheapest_withAllFilters_returns200() throws Exception {
         when(cheapestFlightService.findCheapestFlights(any())).thenReturn(List.of(sampleFlight()));
@@ -204,6 +222,7 @@ class FlightSearchControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("cheapest: origin eksik → 400 Bad Request")
     void cheapest_missingOrigin_returns400() throws Exception {
         mockMvc.perform(get("/api/v1/flights/search/cheapest")
@@ -213,6 +232,7 @@ class FlightSearchControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("ApiLogService asenkron log çağrısı her istekte yapılır")
     void search_callsApiLogServiceOnce() throws Exception {
         when(flightAggregatorService.searchAllFlights(any())).thenReturn(List.of());

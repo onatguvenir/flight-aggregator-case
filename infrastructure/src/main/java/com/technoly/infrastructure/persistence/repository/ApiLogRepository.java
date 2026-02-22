@@ -1,6 +1,8 @@
 package com.technoly.infrastructure.persistence.repository;
 
 import com.technoly.infrastructure.persistence.entity.ApiLogEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -10,13 +12,13 @@ import java.util.List;
 /**
  * API Log JPA Repository
  *
- * Spring Data JPA, bu interface için otomatik implementasyon üretir.
- * JpaRepository<ApiLogEntity, Long>:
- * - ApiLogEntity: entity tipi
- * - Long: primary key tipi
+ * JpaRepository ile PagingAndSortingRepository birleşik olarak gelmektedir.
+ * Eklenen Page<> tabanlı metodlar production senaryolarında OOM (Out of
+ * Memory) riskini ortadan kaldırır: tüm tabloyu belleğe çekmek yerine
+ * sayfa sayfa veri okunur.
  *
- * findBy... metodları: Spring Data JPA, metod adından SQL oluşturur.
- * Bu yaklaşım, tekrar eden JPQL yazımını önler (Convention over Configuration).
+ * findBy...(Pageable) metodları: Spring Data JPA, Pageable'dan LIMIT/OFFSET
+ * ve ORDER BY SQL cümlelerini otomatik üretir.
  */
 @Repository
 public interface ApiLogRepository extends JpaRepository<ApiLogEntity, Long> {
@@ -26,6 +28,12 @@ public interface ApiLogRepository extends JpaRepository<ApiLogEntity, Long> {
      * SQL eşdeğeri: SELECT * FROM api_logs WHERE endpoint = ?
      */
     List<ApiLogEntity> findByEndpoint(String endpoint);
+
+    /**
+     * Belirli bir endpoint için sayfalı log kayıtlarını döner.
+     * Örnek: ?page=0&size=20&sort=createdAt,desc
+     */
+    Page<ApiLogEntity> findByEndpoint(String endpoint, Pageable pageable);
 
     /**
      * Zaman aralığında oluşturulan log kayıtlarını döner.

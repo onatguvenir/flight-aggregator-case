@@ -71,16 +71,65 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
+        <!-- ==========================================================-->
+        <!-- SECURITY: JWT / OAuth2 Resource Server                      -->
+        <!-- Spring Security: HTTP filter zinciri + method security       -->
+        <!-- oauth2-resource-server: JWT Bearer token doğrulaması         -->
+        <!-- ==========================================================-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
+        <!-- ==========================================================-->
+        <!-- RATE LIMITING: Bucket4j + Redis (IP bazlı istek kotası)     -->
+        <!-- bucket4j-core: Token bucket algorithm                        -->
+        <!-- spring-boot-cache: @EnableCaching ile Redis entegrasyonu     -->
+        <!-- ==========================================================-->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.9.0</version>
+        </dependency>
+
+        <!-- ==========================================================-->
+        <!-- ELK: Logstash JSON log encoder                              -->
+        <!-- JSON formatında yapılandırılmış log → Logstash → Elastic    -->
+        <!-- ==========================================================-->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+
         <!-- ===== TEST BAĞIMLILIKLARI ===== -->
+        <!-- Spring Security Test: MockMvc ile güvenli endpoint testleri -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Testcontainers: Integration testlerde gerçek PostgreSQL + Redis başlatır -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Testcontainers Redis: GenericContainer ile Redis container yönetimi -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Windows Docker Desktop Npipe bug (400 Bad Request) çözümü için httpclient5 transport -->
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-transport-httpclient5</artifactId>
+            <version>3.4.0</version>
             <scope>test</scope>
         </dependency>
 

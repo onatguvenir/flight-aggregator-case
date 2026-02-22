@@ -31,7 +31,9 @@
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>
         </dependency>
-        <!-- Jackson: FlightDto JSON serialization için (log json'ları) -->
+        <!-- Jackson annotations: @JsonSerialize (@Masked annotation) için -->
+        <!-- @JsonSerialize jackson-annotations kütüphanesinden gelir -->
+        <!-- jackson-databind burada eklenmez (Lombok proc uyumsuzluğu) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
