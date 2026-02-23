@@ -9,7 +9,16 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
 /**
  * JWT / OAuth2 Resource Server Güvenlik Konfigürasyonu
@@ -85,6 +94,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Sağlık kontrolü: Docker healthcheck, monitoring sistemleri erişebilmeli
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // Token oluşturmak için kullanılan OAuth endpoint'i public
+                        .requestMatchers(HttpMethod.POST, "/oauth/token").permitAll()
                         // Swagger ve OpenAPI dokümantasyon arayüzüne (Uygulama Güvenlik Gereksinimleri)
                         // JWT doğrulaması mecbur kılındı
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/v3/api-docs/**")
@@ -104,9 +115,20 @@ public class SecurityConfig {
      * Güçlü bir secret kullanıldığından (HMAC) emin olur.
      */
     @Bean
-    public org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder() {
-        byte[] secretKeyBytes = jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        javax.crypto.SecretKey secretKey = new javax.crypto.spec.SecretKeySpec(secretKeyBytes, "HmacSHA256");
-        return org.springframework.security.oauth2.jwt.NimbusJwtDecoder.withSecretKey(secretKey).build();
+    public JwtDecoder jwtDecoder() {
+        byte[] secretKeyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        SecretKey secretKey = new SecretKeySpec(secretKeyBytes, "HmacSHA256");
+        return NimbusJwtDecoder.withSecretKey(secretKey).build();
+    }
+
+    /**
+     * Aynı HMAC (HS256) secret ile JWT üreten encoder bean'i.
+     * OAuthTokenController bu bean üzerinden access token üretir.
+     */
+    @Bean
+    public JwtEncoder jwtEncoder() {
+        byte[] secretKeyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        SecretKey secretKey = new SecretKeySpec(secretKeyBytes, "HmacSHA256");
+        return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey));
     }
 }

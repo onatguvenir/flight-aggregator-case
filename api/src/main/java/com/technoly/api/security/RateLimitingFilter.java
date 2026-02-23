@@ -30,9 +30,8 @@ import java.time.Duration;
  *
  * Neden Resilience4j'ye Geçildi?
  * - Projenin genel mimarisinde (Retry, CircuitBreaker, Bulkhead) zaten
- * Resilience4j kullanılıyordu.
- * - Tech-stack homojenizasyonu sağlandı ve 3. parti (Bucket4j) bağımlılığı çöpe
- * atıldı.
+ *   Resilience4j kullanılıyordu.
+ * - Tech-stack homojenizasyonu sağlandı.
  */
 @Slf4j
 @Component
@@ -45,8 +44,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private int capacity;
 
     /**
-     * RateLimiter yenilenme süresi. Default olarak Bucket4J uyumluluğu adına
-     * Dakikada 60 kabul edelim, bu 1 dakikalık pencere anlamına gelir.
+     * RateLimiter yenilenme süresi. Dakikada 60 kabul edelim – 1 dakikalık
+     * pencere anlamına gelir.
      */
     private final Duration limitRefreshPeriod = Duration.ofMinutes(1);
 

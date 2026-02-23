@@ -5,11 +5,11 @@ version: '3.9'
 # =====================================================================
 #
 # Çalıştırma:
-#   Local : docker-compose --env-file .env.local up -d
+#   Local : docker-compose --env-file .env up -d
 #   QA    : docker-compose --env-file .env.qa up -d
 #   Prod  : docker-compose --env-file .env.prod up -d
 #
-# Ortam değişkenleri .env.{local|qa|prod} dosyasından gelir.
+# Ortam değişkenleri .env, .env.qa, .env.prod dosyalarından gelir.
 # docker-compose'a hard-coded değer YOKTUR — 12-factor app prensibi.
 #
 # Servisler:
@@ -83,10 +83,21 @@ services:
       - "8081:8081"
       - "5006:5006"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
       # ELK settings for provider logging
-      - LOGSTASH_HOST=logstash
-      - LOGSTASH_PORT=5044
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: 5044
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      logstash:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     networks:
       - flight_network
     restart: unless-stopped
@@ -103,10 +114,21 @@ services:
       - "8082:8082"
       - "5007:5007"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
       # ELK settings for provider logging
-      - LOGSTASH_HOST=logstash
-      - LOGSTASH_PORT=5044
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: 5044
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      logstash:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8082/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     networks:
       - flight_network
     restart: unless-stopped
@@ -142,7 +164,6 @@ services:
       LOGSTASH_PORT: 5044
       # Security: false → JWT devre dışı (local dev için), true → JWT zorunlu
       SECURITY_ENABLED: ${SECURITY_ENABLED:-false}
-      #JWT_ISSUER_URI: ${JWT_ISSUER_URI:-http://keycloak:8080/realms/flight}  # no Keycloak, issuer not needed
       # Rate Limiting
       RATE_LIMIT_CAPACITY: ${RATE_LIMIT_CAPACITY:-60}
       RATE_LIMIT_REFILL: ${RATE_LIMIT_REFILL:-60}
@@ -153,10 +174,12 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      logstash:
+        condition: service_healthy
       flight-provider-a:
-        condition: service_started
+        condition: service_healthy
       flight-provider-b:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
       interval: 15s
@@ -304,23 +327,6 @@ services:
       - flight_network
     restart: unless-stopped
 
-  # ========================
-  # Keycloak (JWT / OAuth2 Identity Provider) — removed
-  # Sadece SECURITY_ENABLED=true durumunda anlamlı.
-  # Admin UI: http://localhost:8180/admin  — admin/admin
-  # ========================
-  #keycloak:
-  #  image: quay.io/keycloak/keycloak:23.0.6
-  #  container_name: flight_keycloak
-  #  command: start-dev
-  #  environment:
-  #    KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-  #    KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
-  #  ports:
-  #    - "8180:8080"
-  #  networks:
-  #    - flight_network
-  #  restart: unless-stopped
 
 # ========================
 # Named Volumes

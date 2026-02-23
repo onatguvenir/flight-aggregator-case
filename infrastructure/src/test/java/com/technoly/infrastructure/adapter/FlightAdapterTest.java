@@ -112,6 +112,20 @@ class FlightAdapterTest {
         assertThat(result).isNotNull().isEmpty();
     }
 
+    @Test
+    @DisplayName("Gelecek timeout'a düştüğünde exception handle edilir boş liste döner")
+    void shouldHandleTimeoutFromFutures() {
+        when(providerA.searchFlights(testRequest)).thenAnswer(invocation -> {
+            Thread.sleep(15000); // Trigger orTimeout(10, TimeUnit.SECONDS)
+            return createFlights(1, "PROVIDER_A");
+        });
+        when(providerB.searchFlights(testRequest)).thenReturn(createFlights(1, "PROVIDER_B"));
+
+        List<FlightDto> result = flightAdapter.searchAllFlights(testRequest);
+
+        assertThat(result).hasSize(1);
+    }
+
     // ---- Helper ----
     private List<FlightDto> createFlights(int count, String provider) {
         List<FlightDto> flights = new ArrayList<>();

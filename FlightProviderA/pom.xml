@@ -21,6 +21,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web-services</artifactId>
         </dependency>
+        <!-- actuator for health checks / metrics -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- ensure Logstash appender class is available for JSON logging -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
         <dependency>
             <groupId>wsdl4j</groupId>
             <artifactId>wsdl4j</artifactId>
@@ -59,8 +70,9 @@
                     <sources>
                         <source>src/main/resources/flights.xsd</source>
                     </sources>
-                    <outputDirectory>src/main/java</outputDirectory>
-                    <clearOutputDir>false</clearOutputDir>
+                    <!-- Output directly to target so as to prevent polluting version control -->
+                    <outputDirectory>${project.build.directory}/generated-sources/jaxb</outputDirectory>
+                    <clearOutputDir>true</clearOutputDir>
                 </configuration>
             </plugin>
         </plugins>

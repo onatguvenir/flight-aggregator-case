@@ -14,7 +14,13 @@ import org.springframework.ws.client.core.WebServiceTemplate;
 import java.util.List;
 
 /**
- * FlightProvider B — SOAP Web Service Client
+ * Provider B SOAP Client.
+ *
+ * Provider A ile aynı mimari yaklaşımı izler:
+ * - Ortak SOAP çağrı/mapping mantığı {@link AbstractClient} içinde.
+ * - Dayanıklılık (retry/circuit breaker/bulkhead) Resilience4j annotation'ları ile.
+ *
+ * Not: Provider isimleri metrik label'larında ve loglarda ayrıştırma için önemlidir.
  */
 @Component
 class FlightProviderBClient extends AbstractClient implements FlightProviderPort {

@@ -152,4 +152,56 @@ class FlightProviderBClientTest {
         // Assert
         assertThat(result).isEmpty();
     }
+
+    @Test
+    void searchFlights_ShouldReturnEmptyList_WhenRequestIsNull() {
+        List<FlightDto> result = client.searchFlights(null);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void searchFlights_ShouldReturnEmptyList_WhenOriginIsNull() {
+        FlightSearchRequest request = FlightSearchRequest.builder().destination("LHR").build();
+        List<FlightDto> result = client.searchFlights(request);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void searchFlights_ShouldReturnEmptyList_WhenDestinationIsNull() {
+        FlightSearchRequest request = FlightSearchRequest.builder().origin("IST").build();
+        List<FlightDto> result = client.searchFlights(request);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void searchFlights_ShouldHandleNullDepartureDate() {
+        FlightSearchRequest request = FlightSearchRequest.builder().origin("IST").destination("LHR").build();
+        SearchResult mockResult = new SearchResult();
+        when(webServiceTemplate.marshalSendAndReceive(any(SearchRequest.class))).thenReturn(mockResult);
+
+        List<FlightDto> result = client.searchFlights(request);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void mapToFlightDtos_ShouldHandleNullOrEmptyDateTime() {
+        FlightSearchRequest request = FlightSearchRequest.builder()
+                .origin("IST")
+                .destination("LHR")
+                .build();
+
+        SearchResult mockResult = new SearchResult();
+        Flight mockFlight1 = new Flight();
+        mockFlight1.setDepartureTime(null);
+        mockFlight1.setArrivalTime("");
+        mockResult.getFlights().add(mockFlight1);
+
+        when(webServiceTemplate.marshalSendAndReceive(any(SearchRequest.class))).thenReturn(mockResult);
+
+        List<FlightDto> result = client.searchFlights(request);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getDepartureDateTime()).isNotNull();
+        assertThat(result.get(0).getArrivalDateTime()).isNotNull();
+    }
 }

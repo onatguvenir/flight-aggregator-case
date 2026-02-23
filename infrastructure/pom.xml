@@ -130,8 +130,9 @@
                     <sources>
                         <source>src/main/resources/wsdl/flights.xsd</source>
                     </sources>
-                    <outputDirectory>src/main/java</outputDirectory>
-                    <clearOutputDir>false</clearOutputDir>
+                    <!-- Output directly to target so as to prevent polluting version control -->
+                    <outputDirectory>${project.build.directory}/generated-sources/jaxb</outputDirectory>
+                    <clearOutputDir>true</clearOutputDir>
                 </configuration>
             </plugin>
         </plugins>

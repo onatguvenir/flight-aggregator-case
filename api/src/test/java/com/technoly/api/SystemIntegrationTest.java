@@ -1,17 +1,33 @@
 package com.technoly.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flightprovider.wsdl.Flight;
+import com.flightprovider.wsdl.SearchResult;
 import com.technoly.domain.model.FlightSearchResponse;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.ws.client.core.WebServiceTemplate;
+
+import javax.sql.DataSource;
+import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -41,8 +57,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.data.redis.host=localhost",
         "spring.data.redis.port=6379"
 })
-@org.springframework.context.annotation.Import(com.technoly.infrastructure.config.JpaConfig.class)
-@org.springframework.test.context.ActiveProfiles("test")
+@Import(com.technoly.infrastructure.config.JpaConfig.class)
+@ActiveProfiles("test")
 @AutoConfigureMockMvc
 @WithMockUser
 @DisplayName("Çalışan Altyapı İle (Live Localhost) Entegrasyon Testi")
@@ -56,29 +72,29 @@ class SystemIntegrationTest {
 
     // datasource used to bootstrap an H2-friendly table before the context is used
     @Autowired
-    private javax.sql.DataSource dataSource;
+    private DataSource dataSource;
 
-    @org.springframework.boot.test.mock.mockito.MockBean(name = "webServiceTemplateA")
-    private org.springframework.ws.client.core.WebServiceTemplate webServiceTemplateA;
+    @MockBean(name = "webServiceTemplateA")
+    private WebServiceTemplate webServiceTemplateA;
 
-    @org.springframework.boot.test.mock.mockito.MockBean(name = "webServiceTemplateB")
-    private org.springframework.ws.client.core.WebServiceTemplate webServiceTemplateB;
+    @MockBean(name = "webServiceTemplateB")
+    private WebServiceTemplate webServiceTemplateB;
 
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.data.redis.connection.RedisConnectionFactory redisConnectionFactory;
+    @MockBean
+    private RedisConnectionFactory redisConnectionFactory;
 
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.data.redis.connection.ReactiveRedisConnectionFactory reactiveRedisConnectionFactory;
+    @MockBean
+    private ReactiveRedisConnectionFactory reactiveRedisConnectionFactory;
 
     private static final String ORIGIN = "IST";
     private static final String DESTINATION = "LHR";
     private static final String DEPARTURE_DATE = "01-06-2026T10:00";
 
     // create H2-compatible api_logs table before any test methods run
-    @org.junit.jupiter.api.BeforeAll
-    static void initSchema(@Autowired javax.sql.DataSource dataSource) throws java.sql.SQLException {
-        try (java.sql.Connection conn = dataSource.getConnection();
-             java.sql.Statement stmt = conn.createStatement()) {
+    @BeforeAll
+    static void initSchema(@Autowired DataSource dataSource) throws SQLException {
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
             // simple table definition using text/clob so H2 doesn't complain about jsonb
             stmt.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS api_logs (
@@ -100,33 +116,33 @@ class SystemIntegrationTest {
         System.out.println(">>> In-memory H2 database & mocked Redis are in use (no Docker containers)");
 
         // Mock Provider A
-        com.flightprovider.wsdl.SearchResult resultA = new com.flightprovider.wsdl.SearchResult();
+        SearchResult resultA = new SearchResult();
         resultA.setHasError(false);
-        com.flightprovider.wsdl.Flight flightA = new com.flightprovider.wsdl.Flight();
+        Flight flightA = new Flight();
         flightA.setFlightNumber("A123");
         flightA.setOrigin("IST");
         flightA.setDestination("LHR");
         flightA.setDepartureTime("01-06-2026T10:00");
         flightA.setArrivalTime("01-06-2026T14:00");
-        flightA.setPrice(new java.math.BigDecimal("150.00"));
+        flightA.setPrice(new BigDecimal("150.00"));
         resultA.getFlights().add(flightA);
-        org.mockito.Mockito.lenient()
-                .when(webServiceTemplateA.marshalSendAndReceive(org.mockito.ArgumentMatchers.any()))
+        Mockito.lenient()
+                .when(webServiceTemplateA.marshalSendAndReceive(ArgumentMatchers.any()))
                 .thenReturn(resultA);
 
         // Mock Provider B
-        com.flightprovider.wsdl.SearchResult resultB = new com.flightprovider.wsdl.SearchResult();
+        SearchResult resultB = new SearchResult();
         resultB.setHasError(false);
-        com.flightprovider.wsdl.Flight flightB = new com.flightprovider.wsdl.Flight();
+        Flight flightB = new Flight();
         flightB.setFlightNumber("B456");
         flightB.setOrigin("IST");
         flightB.setDestination("LHR");
         flightB.setDepartureTime("01-06-2026T10:00");
         flightB.setArrivalTime("01-06-2026T14:00");
-        flightB.setPrice(new java.math.BigDecimal("120.00"));
+        flightB.setPrice(new BigDecimal("120.00"));
         resultB.getFlights().add(flightB);
-        org.mockito.Mockito.lenient()
-                .when(webServiceTemplateB.marshalSendAndReceive(org.mockito.ArgumentMatchers.any()))
+        Mockito.lenient()
+                .when(webServiceTemplateB.marshalSendAndReceive(ArgumentMatchers.any()))
                 .thenReturn(resultB);
     }
 

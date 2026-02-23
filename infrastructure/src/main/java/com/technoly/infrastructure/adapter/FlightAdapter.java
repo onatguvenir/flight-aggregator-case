@@ -16,9 +16,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Adapter that implements FlightSearchPort by orchestrating multiple
- * FlightProviderPorts.
- * Follows the Open/Closed Principle (OCP) by injecting a List of providers.
+ * FlightSearchPort implementasyonu: provider orkestrasyonu yapan adapter.
+ *
+ * Sorumluluk:
+ * - Spring tarafından inject edilen tüm {@link FlightProviderPort} implementasyonlarını
+ *   (ör. ProviderA, ProviderB) tek bir "arama" operasyonu altında birleştirir.
+ * - Provider çağrılarını paralel çalıştırır ve sonuçları tek listede toplar.
+ *
+ * Tasarım notları:
+ * - {@code List<FlightProviderPort>} injection → yeni bir provider eklemek için
+ *   sadece yeni bir {@code @Component} implementasyon eklemek yeterli (OCP).
+ * - "Kısmi başarı" yaklaşımı: Bir provider hata verirse diğer provider sonuçları
+ *   yine de dönülebilir; bu yüzden hatada boş listeye düşülür.
+ * - Timeout: Provider'ın takılı kalması tüm isteği bloke etmesin diye her
+ *   provider çağrısına süre sınırı uygulanır.
  */
 @Slf4j
 @Component
@@ -26,6 +37,13 @@ import java.util.concurrent.TimeUnit;
 class FlightAdapter implements FlightSearchPort {
 
     private final List<FlightProviderPort> flightProviders;
+    /**
+     * Provider çağrılarını paralelleştirmek için kullanılan thread pool.
+     *
+     * Not: Bu proje örneğinde adapter kendi executor'ını oluşturuyor.
+     * Üretim sistemlerinde genellikle {@code @Bean TaskExecutor} üzerinden yönetmek,
+     * shutdown/lifecycle yönetimini Spring'e bırakmak daha sağlıklıdır.
+     */
     private final ExecutorService executorService = Executors.newFixedThreadPool(4);
 
     @Override
@@ -35,13 +53,17 @@ class FlightAdapter implements FlightSearchPort {
         List<CompletableFuture<List<FlightDto>>> futures = flightProviders.stream()
                 .map(provider -> CompletableFuture
                         .supplyAsync(() -> searchWithProvider(provider, request), executorService)
+                        // Provider bazında üst süre sınırı: bu süre aşılırsa Exception'a düşer
                         .orTimeout(10, TimeUnit.SECONDS)
                         .exceptionally(ex -> {
+                            // Bu noktada "kısmi başarı" için hata yutulur ve boş listeye düşülür.
+                            // Böylece diğer provider'ların sonuçları yine de dönebilir.
                             log.error("[{}] hata: {}", provider.getProviderName(), ex.getMessage());
                             return new ArrayList<>();
                         }))
                 .toList();
 
+        // join(): tüm futures tamamlanana kadar bekler (ya sonuç ya da boş liste)
         return futures.stream()
                 .map(CompletableFuture::join)
                 .flatMap(List::stream)
@@ -50,9 +72,12 @@ class FlightAdapter implements FlightSearchPort {
 
     private List<FlightDto> searchWithProvider(FlightProviderPort provider, FlightSearchRequest request) {
         try {
+            // Provider implementasyonu kendi içinde Resilience4j (retry/cb/bulkhead) uyguluyor olabilir.
+            // Burada amaç: tek provider hatasının tüm akışı bozmamasını sağlamak.
+            log.info("searchWithProvider Request: {}", request.toString());
             return provider.searchFlights(request);
         } catch (Exception e) {
-            log.error("[{}] Beklenmeyen hata: {}", provider.getProviderName(), e.getMessage());
+            log.error("[{}] Beklenmeyen hata: {} - Request: {}", provider.getProviderName(), e.getMessage(),request.toString());
             return new ArrayList<>();
         }
     }

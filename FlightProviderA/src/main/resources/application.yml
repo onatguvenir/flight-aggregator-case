@@ -4,3 +4,13 @@ server:
 spring:
     application:
         name: flight-provider-a
+
+management:
+    endpoints:
+        web:
+            exposure:
+                include: health,info
+    health:
+        redis:
+            enabled: false
+                

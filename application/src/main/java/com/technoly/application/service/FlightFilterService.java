@@ -89,7 +89,7 @@ class FlightFilterService {
     private Predicate<FlightDto> buildPricePredicate(FlightSearchRequest req) {
         return flight -> {
             if (flight.getPrice() == null) {
-                // Fiyatı bilinmeyen uçuş, fiyat filtresi varsa elenmir
+                // Fiyatı bilinmeyen uçuş, fiyat filtresi varsa elenir.
                 return req.getPriceMin() == null && req.getPriceMax() == null;
             }
             boolean minOk = req.getPriceMin() == null

@@ -3,7 +3,7 @@
 # Ortama özel değerler application-{profile}.yml'de tanımlanır.
 #
 # Profil belirleme:
-#   Local : SPRING_PROFILES_ACTIVE=local  (varsayılan)
+#   Docker : SPRING_PROFILES_ACTIVE=docker  (varsayılan)
 #   QA    : SPRING_PROFILES_ACTIVE=qa
 #   Prod  : SPRING_PROFILES_ACTIVE=prod
 # =====================================================================
@@ -11,9 +11,9 @@ spring:
   application:
     name: flight-aggregator
 
-  # Aktif profil belirtilmezse 'local' kullan
+  # Aktif profil belirtilmezse 'docker' kullan
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}
+    active: ${SPRING_PROFILES_ACTIVE:docker}
 
   # ===========================
   # PostgreSQL Datasource (Base)
@@ -53,6 +53,10 @@ spring:
   # ===========================
   # Redis (Base)
   # ===========================
+  cache:
+    type: redis
+    redis:
+      enable-statistics: true
   data:
     redis:
       host: ${REDIS_HOST}
@@ -78,6 +82,7 @@ spring:
 # ===========================
 # Cache
 # ===========================
+# Redis istatistiklerini (hit/miss) Micrometer'a aç (spring.cache.redis.enable-statistics)
 cache:
   flight:
     ttl-minutes: ${CACHE_TTL_MINUTES:5}
@@ -106,7 +111,7 @@ security:
   enabled: ${SECURITY_ENABLED:true}
 
 # ===========================
-# Rate Limiting (Bucket4j)
+# Rate Limiting
 # ===========================
 rate-limit:
   # IP başına kovadaki maksimum token sayısı (burst limit)
@@ -194,6 +199,14 @@ resilience4j:
       providerB:
         max-concurrent-calls: ${BULKHEAD_MAX_CALLS:10}
         max-wait-duration: 1s
+
+# ===========================
+# OAuth Demo Client (Token Üretimi için)
+# ===========================
+auth:
+  client-id: ${AUTH_CLIENT_ID:flight-client}
+  client-secret: ${AUTH_CLIENT_SECRET:flight-secret}
+  token-validity-seconds: ${AUTH_TOKEN_TTL:3600}
 
 # ===========================
 # Loglama (Base)
