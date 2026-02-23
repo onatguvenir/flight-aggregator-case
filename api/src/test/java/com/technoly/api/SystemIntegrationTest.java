@@ -2,6 +2,7 @@ package com.technoly.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.technoly.domain.model.FlightSearchResponse;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
         "spring.flyway.enabled=false",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
+        // disable automatic schema creation because H2 doesn't understand jsonb
+        "spring.jpa.hibernate.ddl-auto=none",
         "spring.data.redis.host=localhost",
         "spring.data.redis.port=6379"
 })
@@ -51,6 +53,10 @@ class SystemIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    // datasource used to bootstrap an H2-friendly table before the context is used
+    @Autowired
+    private javax.sql.DataSource dataSource;
 
     @org.springframework.boot.test.mock.mockito.MockBean(name = "webServiceTemplateA")
     private org.springframework.ws.client.core.WebServiceTemplate webServiceTemplateA;
@@ -68,9 +74,30 @@ class SystemIntegrationTest {
     private static final String DESTINATION = "LHR";
     private static final String DEPARTURE_DATE = "01-06-2026T10:00";
 
+    // create H2-compatible api_logs table before any test methods run
+    @org.junit.jupiter.api.BeforeAll
+    static void initSchema(@Autowired javax.sql.DataSource dataSource) throws java.sql.SQLException {
+        try (java.sql.Connection conn = dataSource.getConnection();
+             java.sql.Statement stmt = conn.createStatement()) {
+            // simple table definition using text/clob so H2 doesn't complain about jsonb
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS api_logs (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        endpoint VARCHAR(255) NOT NULL,
+                        request CLOB NOT NULL,
+                        response CLOB,
+                        status_code INTEGER,
+                        duration_ms BIGINT,
+                        created_at TIMESTAMP NOT NULL
+                    )
+                    """);
+        }
+    }
+
     @BeforeEach
     void verifyAndLog() {
-        System.out.println(">>> Localhost üzerindeki aktif PostgreSQL ve Redis docker container'larına bağlanıldı...");
+        // message updated to reflect test setup: H2 in‑memory DB and mocked Redis
+        System.out.println(">>> In-memory H2 database & mocked Redis are in use (no Docker containers)");
 
         // Mock Provider A
         com.flightprovider.wsdl.SearchResult resultA = new com.flightprovider.wsdl.SearchResult();

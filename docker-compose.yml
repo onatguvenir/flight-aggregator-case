@@ -76,13 +76,17 @@ services:
   # ========================
   flight-provider-a:
     build:
-      context: ../FlightProviderA
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: FlightProviderA/Dockerfile
     container_name: flight_provider_a
     ports:
       - "8081:8081"
+      - "5006:5006"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      # ELK settings for provider logging
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5044
     networks:
       - flight_network
     restart: unless-stopped
@@ -92,13 +96,17 @@ services:
   # ========================
   flight-provider-b:
     build:
-      context: ../FlightProviderB
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: FlightProviderB/Dockerfile
     container_name: flight_provider_b
     ports:
       - "8082:8082"
+      - "5007:5007"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      # ELK settings for provider logging
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5044
     networks:
       - flight_network
     restart: unless-stopped
@@ -113,8 +121,10 @@ services:
     container_name: flight_aggregator
     ports:
       - "8080:8080"
+      - "5005:5005"
     # Tüm değerler .env.{local|qa|prod} dosyasından gelir
     environment:
+      # debugging disabled in compose; avoid JVM suspension
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
       DB_URL: ${DB_URL}
       DB_USER: ${DB_USER}

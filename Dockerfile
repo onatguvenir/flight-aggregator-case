@@ -7,18 +7,10 @@ FROM maven:3.9.6-eclipse-temurin-17-alpine AS builder
 
 WORKDIR /app
 
-# Provider A bağımlılığını kopyala ve local m2 repository'sine yükle
-COPY FlightProviderA FlightProviderA
-RUN mvn -f FlightProviderA/pom.xml clean install -DskipTests
+# kopyala tüm proje (context ../ olduğundan uçuş-aggregator ve sağlayıcılar dahil)
+COPY . .
 
-# Provider B bağımlılığını kopyala ve local m2 repository'sine yükle
-COPY FlightProviderB FlightProviderB
-RUN mvn -f FlightProviderB/pom.xml clean install -DskipTests
-
-# Aggregator projesinin tamamını kopyala
-COPY flight-aggregator flight-aggregator
-
-# Aggregator'ı derle (Provider A ve B local repository'de yüklü olduğu için hata vermeden derlenecek)
+# build root aggregator pom which will compile all modules including providers
 RUN mvn -f flight-aggregator/pom.xml clean package -DskipTests
 
 # =====================================================================
