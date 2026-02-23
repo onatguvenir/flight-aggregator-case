@@ -18,32 +18,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Sistem Entegrasyon Testi — Mevcut Çalışan (Live) Altyapı İle
+ * Sistem Entegrasyon Testi — In-Memory H2 Veritabanı İle
  *
- * NOT: Bu test "docker-compose up -d" ile çalışan
- * PostgreSQL (5432) ve Redis (6379) veritabanı instance'larınıza
- * bağlanarak çalışacak şekilde konfigüre edilmiştir.
- * Testcontainers'daki Docker Desktop kısıtlamaları nedeniyle doğrudan
- * kullanılır.
+ * NOT: Bu test, testcontainers kaldırıldığı için dış bir Docker bağımlılığı
+ * olmadan doğrudan In-Memory H2 veritabanı (flightdb) üzerinde çalışır.
+ *
+ * SOAP ve Redis entegrasyonları için Mock / In-Memory çözümleri
+ * kullanılarak izole edilmiştir.
  */
+
 @SpringBootTest(classes = FlightAggregatorApplication.class, properties = {
         "security.enabled=false",
-        "spring.security.oauth2.resourceserver.jwt.issuer-uri=",
-        "rate-limit.capacity=600",
-        "rate-limit.refill-per-minute=600",
-        "logging.level.net.logstash=OFF",
-        // Canlı Localhost Docker Connection Ayarları:
-        "spring.datasource.url=jdbc:postgresql://localhost:5432/flightdb",
-        "spring.datasource.username=flightuser",
-        "spring.datasource.password=flightpass",
-        "spring.datasource.driver-class-name=org.postgresql.Driver",
-        "spring.flyway.url=jdbc:postgresql://localhost:5432/flightdb",
-        "spring.flyway.user=flightuser",
-        "spring.flyway.password=flightpass",
+        "spring.datasource.url=jdbc:h2:mem:flightdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
+        "spring.flyway.enabled=false",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.data.redis.host=localhost",
         "spring.data.redis.port=6379"
 })
 @org.springframework.context.annotation.Import(com.technoly.infrastructure.config.JpaConfig.class)
+@org.springframework.test.context.ActiveProfiles("test")
 @AutoConfigureMockMvc
 @WithMockUser
 @DisplayName("Çalışan Altyapı İle (Live Localhost) Entegrasyon Testi")
@@ -61,9 +58,15 @@ class SystemIntegrationTest {
     @org.springframework.boot.test.mock.mockito.MockBean(name = "webServiceTemplateB")
     private org.springframework.ws.client.core.WebServiceTemplate webServiceTemplateB;
 
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.data.redis.connection.RedisConnectionFactory redisConnectionFactory;
+
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.data.redis.connection.ReactiveRedisConnectionFactory reactiveRedisConnectionFactory;
+
     private static final String ORIGIN = "IST";
     private static final String DESTINATION = "LHR";
-    private static final String DEPARTURE_DATE = "2026-06-01T10:00:00";
+    private static final String DEPARTURE_DATE = "01-06-2026T10:00";
 
     @BeforeEach
     void verifyAndLog() {
@@ -76,8 +79,8 @@ class SystemIntegrationTest {
         flightA.setFlightNumber("A123");
         flightA.setOrigin("IST");
         flightA.setDestination("LHR");
-        flightA.setDepartureTime("2026-06-01T10:00:00");
-        flightA.setArrivalTime("2026-06-01T14:00:00");
+        flightA.setDepartureTime("01-06-2026T10:00");
+        flightA.setArrivalTime("01-06-2026T14:00");
         flightA.setPrice(new java.math.BigDecimal("150.00"));
         resultA.getFlights().add(flightA);
         org.mockito.Mockito.lenient()
@@ -91,8 +94,8 @@ class SystemIntegrationTest {
         flightB.setFlightNumber("B456");
         flightB.setOrigin("IST");
         flightB.setDestination("LHR");
-        flightB.setDepartureTime("2026-06-01T10:00:00");
-        flightB.setArrivalTime("2026-06-01T14:00:00");
+        flightB.setDepartureTime("01-06-2026T10:00");
+        flightB.setArrivalTime("01-06-2026T14:00");
         flightB.setPrice(new java.math.BigDecimal("120.00"));
         resultB.getFlights().add(flightB);
         org.mockito.Mockito.lenient()

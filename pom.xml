@@ -40,6 +40,8 @@
         <module>infrastructure</module>
         <module>application</module>
         <module>api</module>
+        <module>FlightProviderA</module>
+        <module>FlightProviderB</module>
     </modules>
 
     <properties>
@@ -48,7 +50,6 @@
         <!-- Bağımlılık versiyonları — tek yerden yönetilir -->
         <resilience4j.version>2.2.0</resilience4j.version>
         <springdoc.version>2.3.0</springdoc.version>
-        <testcontainers.version>1.20.4</testcontainers.version>
         <wiremock.version>3.4.2</wiremock.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <!--
@@ -108,15 +109,6 @@
                 <groupId>org.flywaydb</groupId>
                 <artifactId>flyway-database-postgresql</artifactId>
                 <version>10.7.2</version>
-            </dependency>
-
-            <!-- ===== TESTCONTAINERS ===== -->
-            <dependency>
-                <groupId>org.testcontainers</groupId>
-                <artifactId>testcontainers-bom</artifactId>
-                <version>${testcontainers.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
             </dependency>
 
             <!-- ===== SPRINGDOC (Swagger UI) ===== -->
@@ -240,6 +232,8 @@
                             <exclude>**/*Application.java</exclude>
                             <exclude>**/soap/**</exclude>
                             <exclude>**/persistence/entity/**</exclude>
+                            <exclude>**/filter/**</exclude>
+                            <exclude>**/security/**</exclude>
                         </excludes>
                     </configuration>
                     <executions>

@@ -18,8 +18,8 @@ import org.springframework.security.web.SecurityFilterChain;
  * - Her gelen HTTP isteği, Authorization header'ındaki Bearer JWT token'ını
  * doğrular.
  * - Token doğrulaması, JwtDecoder Bean'i üzerinden yapılır.
- * - JwtDecoder, "spring.security.oauth2.resourceserver.jwt.issuer-uri"
- * değerinden issuer'ın public key'ini otomatik keşfeder (OIDC Discovery).
+ * - JwtDecoder, "JWT_SECRET" simetrik anahtarını kullanarak HMAC (HS256)
+ * ile JWT imzalarını doğrular.
  *
  * Güvenlik Mimarisi:
  * Client → Bearer JWT → Spring Security Filter → API Controller
@@ -30,22 +30,24 @@ import org.springframework.security.web.SecurityFilterChain;
  *
  * Public Endpoint'ler (token gerekmez):
  * - /actuator/health → Docker healthcheck için
- * - /swagger-ui/** → API dokümantasyonu
- * - /api-docs/** → OpenAPI JSON spec
+ * - /actuator/health → Docker healthcheck için
+ * - /actuator/prometheus → Prometheus metrics koleksiyonu
  *
  * Korunan Endpoint'ler (geçerli JWT gerekir):
  * - /api/v1/** → Tüm uçuş ve log API'leri
  *
  * Security Disabled Profile (dev):
  * SECURITY_ENABLED=false env değişkeni ile SecurityConfig tamamen devre dışı
- * bırakılabilir. Bu, local geliştirme sırasında Keycloak çalıştırma
- * zorunluluğunu
- * ortadan kaldırır.
+ * bırakılabilir. Bu, local geliştirme sırasında token üretim
+ * zorunluluğunu ortadan kaldırır.
  */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    @Value("${spring.security.oauth2.resourceserver.jwt.secret-string}")
+    private String jwtSecret;
 
     /**
      * JWT token güvenliğini etkinleştirip devre dışı bırakabiliriz.
@@ -83,22 +85,28 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Sağlık kontrolü: Docker healthcheck, monitoring sistemleri erişebilmeli
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        // Swagger / OpenAPI dokümantasyon arayüzü
-                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**").permitAll()
-                        // Prometheus (ağ seviyesinde kısıtlama yapılmalı, API seviyesinde açık)
-                        .requestMatchers("/actuator/prometheus").permitAll()
+                        // Swagger ve OpenAPI dokümantasyon arayüzüne (Uygulama Güvenlik Gereksinimleri)
+                        // JWT doğrulaması mecbur kılındı
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/v3/api-docs/**")
+                        .authenticated()
                         // GET isteklerine kimlik doğrulaması zorunlu
                         .requestMatchers(HttpMethod.GET, "/api/v1/**").authenticated()
                         // Tüm diğer istekler doğrulanmış olmalı
                         .anyRequest().authenticated())
 
                 // OAuth2 Resource Server: JWT Bearer token doğrulaması
-                // application.yml'deki jwt.issuer-uri'den public key otomatik keşfedilir
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> {
-                            // Ekstra JWT claim doğrulaması gerekirse buraya eklenebilir
-                            // Örnek: jwt.jwtAuthenticationConverter(converter)
-                        }))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder())))
                 .build();
+    }
+
+    /**
+     * Simetrik anahtar (HS256) ile JWT token çözen decoder bean'i.
+     * Güçlü bir secret kullanıldığından (HMAC) emin olur.
+     */
+    @Bean
+    public org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder() {
+        byte[] secretKeyBytes = jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        javax.crypto.SecretKey secretKey = new javax.crypto.spec.SecretKeySpec(secretKeyBytes, "HmacSHA256");
+        return org.springframework.security.oauth2.jwt.NimbusJwtDecoder.withSecretKey(secretKey).build();
     }
 }

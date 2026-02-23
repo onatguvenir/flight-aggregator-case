@@ -36,7 +36,7 @@ public class FlightSearchResponse {
     private int totalCount;
 
     /** Aramanın yapıldığı zaman damgası */
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime searchedAt;
 
     // ---- Static Factory Methods ----

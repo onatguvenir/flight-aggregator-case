@@ -42,7 +42,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-public class FlightFilterService {
+class FlightFilterService {
 
     /**
      * Tüm aktif filtreleri uçuş listesine uygular.
@@ -51,7 +51,7 @@ public class FlightFilterService {
      * @param request Filtre parametrerini içeren arama isteği
      * @return Filtrelenmiş yeni liste (orijinal liste değişmez)
      */
-    public List<FlightDto> applyFilters(List<FlightDto> flights, FlightSearchRequest request) {
+    List<FlightDto> applyFilters(List<FlightDto> flights, FlightSearchRequest request) {
         if (flights == null || flights.isEmpty()) {
             return List.of();
         }

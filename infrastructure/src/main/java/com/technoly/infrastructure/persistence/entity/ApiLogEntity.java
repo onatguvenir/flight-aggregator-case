@@ -59,11 +59,11 @@ public class ApiLogEntity {
 
     /**
      * JSON formatında HTTP request body/params.
-     * @JdbcTypeCode(SqlTypes.JSON): Hibernate 6'da PostgreSQL JSONB desteği
-     * Karşı taraf: Hibernate 5'te @Type(JsonType.class) kullanılırdı.
+     * @JdbcTypeCode(SqlTypes.JSON): Hibernate 6'da veritabanına uygun JSON tipi
+     * seçer.
      */
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "request", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "request", nullable = false)
     private String request;
 
     /**
@@ -71,7 +71,7 @@ public class ApiLogEntity {
      * nullable=true: Hata durumunda response olmayabilir.
      */
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "response", columnDefinition = "jsonb")
+    @Column(name = "response")
     private String response;
 
     /** HTTP durum kodu: 200, 400, 500 vb. */

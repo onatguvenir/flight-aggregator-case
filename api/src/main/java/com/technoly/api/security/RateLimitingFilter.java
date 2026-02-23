@@ -1,7 +1,8 @@
 package com.technoly.api.security;
 
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
+import io.github.resilience4j.ratelimiter.RateLimiter;
+import io.github.resilience4j.ratelimiter.RateLimiterConfig;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,51 +16,56 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * IP Bazlı Rate Limiting Filtresi (Token Bucket Algoritması)
+ * IP Bazlı Rate Limiting Filtresi (Resilience4j)
  *
  * Nasıl Çalışır?
- * Bucket4j, Token Bucket algoritmasını uygular:
- * - Her IP adresi için ayrı bir "kova" (bucket) tutulur.
- * - Kova belirli kapasitede token barındırır (örn: 60 istek).
- * - Her API isteği 1 token tüketir.
- * - Kova, belirli aralıklarla (örn: dakikada 60) yeniden dolar.
- * - Kova boşaldığında 429 Too Many Requests döner.
+ * Resilience4j RateLimiter, Token Bucket veya Semaphore prensibi ile çalışır:
+ * - Her benzersiz IP adresi için 'RateLimiterRegistry' kullanılarak dinamik
+ * RateLimiter yaratılır.
+ * - Saniyedeki/dakikadaki izin verilen istek süresi (limitRefreshPeriod)
+ * konfigüre edilebilir.
+ * - Limit aşıldığında 429 Too Many Requests HTTP durumu döndürülür.
  *
- * Neden ConcurrentHashMap?
- * - Prod'da Redis Bucket4j extension'ı ile değiştirilmeli (node başına
- * eşitleme).
- * - Bu implementasyon tek node için uygundur (Docker Compose ortamı).
- * - Çoklu node: bucket4j-redis veya bucket4j-hazelcast kullanılmalı.
- *
- * OncePerRequestFilter:
- * - Her HTTP isteği için yalnızca bir kez çalışır (forward/include tekrarı
- * olmaz).
- * - Spring Security'nin filterChain'ine otomatik eklenir (@Component ile).
+ * Neden Resilience4j'ye Geçildi?
+ * - Projenin genel mimarisinde (Retry, CircuitBreaker, Bulkhead) zaten
+ * Resilience4j kullanılıyordu.
+ * - Tech-stack homojenizasyonu sağlandı ve 3. parti (Bucket4j) bağımlılığı çöpe
+ * atıldı.
  */
 @Slf4j
 @Component
 public class RateLimitingFilter extends OncePerRequestFilter {
 
     /**
-     * IP başına dakikada izin verilen maksimum istek sayısı.
-     * .env veya application.yml'den overridable.
+     * IP başına sınırlandırılan periyotta izin verilen kapasite.
      */
     @Value("${rate-limit.capacity:60}")
-    private long capacity;
-
-    @Value("${rate-limit.refill-per-minute:60}")
-    private long refillPerMinute;
+    private int capacity;
 
     /**
-     * IP → Bucket eşlemesi.
-     * Her benzersiz client IP'si için bir bucket oluşturulur.
-     * ConcurrentHashMap: thread-safe, yüksek eşzamanlılık için uygun.
+     * RateLimiter yenilenme süresi. Default olarak Bucket4J uyumluluğu adına
+     * Dakikada 60 kabul edelim, bu 1 dakikalık pencere anlamına gelir.
      */
-    private final Map<String, Bucket> ipBuckets = new ConcurrentHashMap<>();
+    private final Duration limitRefreshPeriod = Duration.ofMinutes(1);
+
+    /**
+     * Bekleme süresi. Rate limitten geçmeyen anlık bloklansın (0)
+     */
+    private final Duration timeoutDuration = Duration.ZERO;
+
+    /**
+     * Dinamik olarak çalışma zamanında (Runtime) yeni konfigurasyonlu RateLimiter
+     * nesneleri
+     * yaratma ve saklama görevini üstlenen Resilience4j Registry'si.
+     */
+    private final RateLimiterRegistry rateLimiterRegistry;
+
+    public RateLimitingFilter() {
+        // Registry varsayılan olarak in-memory map tabanlıdır.
+        this.rateLimiterRegistry = RateLimiterRegistry.ofDefaults();
+    }
 
     @Override
     protected void doFilterInternal(
@@ -68,20 +74,22 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         String clientIp = extractClientIp(request);
-        Bucket bucket = resolveBucket(clientIp);
+        RateLimiter rateLimiter = resolveRateLimiter(clientIp);
 
-        // Token tüket — eğer yeterli token yoksa false döner
-        if (bucket.tryConsume(1)) {
-            // Token tüketildi → isteği devam ettir
-            long remainingTokens = bucket.getAvailableTokens();
-            response.setHeader("X-Rate-Limit-Remaining", String.valueOf(remainingTokens));
+        // İzin al. acquirePermission() true dönerse engelleme yoktur.
+        boolean permissionAcquired = rateLimiter.acquirePermission();
+
+        if (permissionAcquired) {
+            // İzin alındı, X-Rate-Limit gibi başlıkları passlayabilir, devam ediyoruz...
+            response.setHeader("X-Rate-Limit-Remaining",
+                    String.valueOf(rateLimiter.getMetrics().getAvailablePermissions()));
             filterChain.doFilter(request, response);
         } else {
             // Kota doldu → 429 Too Many Requests
             log.warn("[RateLimit] IP: {} limit aşıldı. Path: {}", clientIp, request.getRequestURI());
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader("X-Rate-Limit-Retry-After-Seconds", "60");
-            response.setContentType("application/json");
+            response.setContentType("application/json;charset=UTF-8");
             response.getWriter()
                     .write("""
                             {"error": "Too Many Requests", "message": "Dakika başına istek limitiniz doldu. Lütfen 60 saniye sonra tekrar deneyin.", "status": 429}
@@ -90,43 +98,25 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     /**
-     * IP için mevcut bucket'ı döndürür, yoksa yeni bucket oluşturur.
-     * computeIfAbsent() thread-safe atomik bucket oluşturma sağlar.
+     * Gelen Client IP'si için uygun RateLimiter nesnesini bulur.
+     * Yoksa, dinamik şekilde yeni ayarlar üreterek Registry içinde kaydeder.
      */
-    private Bucket resolveBucket(String clientIp) {
-        return ipBuckets.computeIfAbsent(clientIp, this::createNewBucket);
-    }
-
-    /**
-     * Yeni bir Token Bucket oluşturur.
-     *
-     * Bandwidth.classic(): Sabit kapasiteli, düzenli yenilenen bandwidth.
-     * - capacity: Kovadaki maksimum token sayısı (burst limit)
-     * - Refill.intervally(): Belirtilen süre sonunda kovayı tamamen doldurur.
-     * (dakika başında 60 token → greedy değil, interval-based)
-     */
-    private Bucket createNewBucket(String clientIp) {
-        // Bucket4j 8.x modern fluent API (Refill/Bandwidth.classic() deprecated'dır)
-        // simple(): Kapasiteyi bir kez doldurup dakikada refillPerMinute token ekler
-        Bandwidth limit = Bandwidth.builder()
-                .capacity(capacity)
-                .refillIntervally(refillPerMinute, Duration.ofMinutes(1))
+    private RateLimiter resolveRateLimiter(String clientIp) {
+        RateLimiterConfig config = RateLimiterConfig.custom()
+                .limitRefreshPeriod(limitRefreshPeriod)
+                .limitForPeriod(capacity)
+                .timeoutDuration(timeoutDuration)
                 .build();
-        return Bucket.builder()
-                .addLimit(limit)
-                .build();
+        return rateLimiterRegistry.rateLimiter(clientIp, config);
     }
 
     /**
      * Client IP adresini çıkarır.
      * Reverse proxy (Nginx, LB) durumunda X-Forwarded-For header'ı kontrol edilir.
-     * X-Real-IP: single hop proxy için
-     * RemoteAddr: doğrudan bağlantı için
      */
     private String extractClientIp(HttpServletRequest request) {
         String forwardedFor = request.getHeader("X-Forwarded-For");
         if (forwardedFor != null && !forwardedFor.isBlank()) {
-            // X-Forwarded-For: client, proxy1, proxy2 — ilk IP gerçek client
             return forwardedFor.split(",")[0].trim();
         }
         String realIp = request.getHeader("X-Real-IP");

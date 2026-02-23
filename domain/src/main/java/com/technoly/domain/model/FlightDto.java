@@ -38,11 +38,11 @@ public class FlightDto {
     private String destination;
 
     /** Kalkış tarih/saati — gruplama anahtarının bir parçası */
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime departureDateTime;
 
     /** Varış tarih/saati — gruplama anahtarının bir parçası */
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime arrivalDateTime;
 
     /** Uçuş fiyatı — cheapest seçimi için kullanılır */

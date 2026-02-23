@@ -71,9 +71,9 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # Keycloak veya herhangi bir OIDC provider'ın issuer URI'si
-          # OIDC Discovery ile public key otomatik alınır
-          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8180/realms/flight}
+          # Symmetric key JWT decoding (HMAC/HS256)
+          secret-string: ${JWT_SECRET:my-32-character-ultra-secure-and-ultra-long-secret}
+          jws-algorithms: HS256
 
 # ===========================
 # Cache

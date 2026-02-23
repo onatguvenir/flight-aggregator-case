@@ -21,7 +21,6 @@ version: '3.9'
 #   - elasticsearch     : Log storage (:9200)
 #   - logstash          : Log aggregator (:5044)
 #   - kibana            : Log UI (:5601)
-#   - keycloak          : Identity Provider / JWT auth (:8180)
 # =====================================================================
 
 services:
@@ -133,7 +132,7 @@ services:
       LOGSTASH_PORT: 5044
       # Security: false → JWT devre dışı (local dev için), true → JWT zorunlu
       SECURITY_ENABLED: ${SECURITY_ENABLED:-false}
-      JWT_ISSUER_URI: ${JWT_ISSUER_URI:-http://keycloak:8080/realms/flight}
+      #JWT_ISSUER_URI: ${JWT_ISSUER_URI:-http://keycloak:8080/realms/flight}  # no Keycloak, issuer not needed
       # Rate Limiting
       RATE_LIMIT_CAPACITY: ${RATE_LIMIT_CAPACITY:-60}
       RATE_LIMIT_REFILL: ${RATE_LIMIT_REFILL:-60}
@@ -296,22 +295,22 @@ services:
     restart: unless-stopped
 
   # ========================
-  # Keycloak (JWT / OAuth2 Identity Provider)
+  # Keycloak (JWT / OAuth2 Identity Provider) — removed
   # Sadece SECURITY_ENABLED=true durumunda anlamlı.
   # Admin UI: http://localhost:8180/admin  — admin/admin
   # ========================
-  keycloak:
-    image: quay.io/keycloak/keycloak:23.0.6
-    container_name: flight_keycloak
-    command: start-dev
-    environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
-    ports:
-      - "8180:8080"
-    networks:
-      - flight_network
-    restart: unless-stopped
+  #keycloak:
+  #  image: quay.io/keycloak/keycloak:23.0.6
+  #  container_name: flight_keycloak
+  #  command: start-dev
+  #  environment:
+  #    KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+  #    KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+  #  ports:
+  #    - "8180:8080"
+  #  networks:
+  #    - flight_network
+  #  restart: unless-stopped
 
 # ========================
 # Named Volumes

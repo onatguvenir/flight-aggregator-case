@@ -86,17 +86,6 @@
         </dependency>
 
         <!-- ==========================================================-->
-        <!-- RATE LIMITING: Bucket4j + Redis (IP bazlı istek kotası)     -->
-        <!-- bucket4j-core: Token bucket algorithm                        -->
-        <!-- spring-boot-cache: @EnableCaching ile Redis entegrasyonu     -->
-        <!-- ==========================================================-->
-        <dependency>
-            <groupId>com.bucket4j</groupId>
-            <artifactId>bucket4j-core</artifactId>
-            <version>8.9.0</version>
-        </dependency>
-
-        <!-- ==========================================================-->
         <!-- ELK: Logstash JSON log encoder                              -->
         <!-- JSON formatında yapılandırılmış log → Logstash → Elastic    -->
         <!-- ==========================================================-->
@@ -113,23 +102,10 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Testcontainers: Integration testlerde gerçek PostgreSQL + Redis başlatır -->
+        <!-- H2 In-Memory Database for standard Integration Tests -->
         <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <!-- Testcontainers Redis: GenericContainer ile Redis container yönetimi -->
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <!-- Windows Docker Desktop Npipe bug (400 Bad Request) çözümü için httpclient5 transport -->
-        <dependency>
-            <groupId>com.github.docker-java</groupId>
-            <artifactId>docker-java-transport-httpclient5</artifactId>
-            <version>3.4.0</version>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
 

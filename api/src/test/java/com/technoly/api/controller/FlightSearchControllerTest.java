@@ -60,15 +60,15 @@ class FlightSearchControllerTest {
     @MockBean
     private ApiLogService apiLogService;
 
-    private static final String BASE_DATE = "2026-06-01T00:00:00";
+    private static final String BASE_DATE = "01-06-2026T15:00";
 
     private FlightDto sampleFlight() {
         return FlightDto.builder()
                 .flightNumber("TK1001")
                 .origin("IST")
                 .destination("COV")
-                .departureDateTime(LocalDateTime.of(2026, 6, 1, 9, 0))
-                .arrivalDateTime(LocalDateTime.of(2026, 6, 1, 12, 0))
+                .departureDateTime(LocalDateTime.of(2026, 6, 1, 15, 0))
+                .arrivalDateTime(LocalDateTime.of(2026, 6, 1, 18, 0))
                 .price(BigDecimal.valueOf(250))
                 .provider("PROVIDER_A")
                 .build();
@@ -123,10 +123,10 @@ class FlightSearchControllerTest {
                 .param("origin", "IST")
                 .param("destination", "COV")
                 .param("departureDate", BASE_DATE)
-                .param("departureDateFrom", "2026-06-01T06:00:00")
-                .param("departureDateTo", "2026-06-01T18:00:00")
-                .param("arrivalDateFrom", "2026-06-01T09:00:00")
-                .param("arrivalDateTo", "2026-06-01T23:00:00"))
+                .param("departureDateFrom", "01-06-2026T10:00")
+                .param("departureDateTo", "01-06-2026T18:00")
+                .param("arrivalDateFrom", "01-06-2026T14:00")
+                .param("arrivalDateTo", "01-06-2026T20:00"))
                 .andExpect(status().isOk());
     }
 
@@ -217,7 +217,7 @@ class FlightSearchControllerTest {
                 .param("departureDate", BASE_DATE)
                 .param("priceMin", "200")
                 .param("priceMax", "600")
-                .param("departureDateFrom", "2026-06-01T06:00:00"))
+                .param("departureDateFrom", "01-06-2026T10:00"))
                 .andExpect(status().isOk());
     }
 

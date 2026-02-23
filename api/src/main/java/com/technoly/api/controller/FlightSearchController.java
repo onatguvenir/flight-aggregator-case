@@ -80,7 +80,7 @@ public class FlightSearchController {
 
                         @Parameter(description = "Varış IATA kodu", example = "COV", required = true) @RequestParam @NotBlank String destination,
 
-                        @Parameter(description = "Kalkış tarihi (yyyy-MM-dd'T'HH:mm:ss)", example = "2026-06-01T00:00:00", required = true) @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departureDate,
+                        @Parameter(description = "Kalkış tarihi (dd-MM-yyyy'T'HH:mm)", example = "01-06-2026T00:00", required = true) @RequestParam @NotNull @DateTimeFormat(pattern = "dd-MM-yyyy'T'HH:mm") LocalDateTime departureDate,
 
                         // ---- Opsiyonel Fiyat Filtreleri ----
                         @Parameter(description = "Minimum fiyat (dahil, örn: 100.00)") @RequestParam(required = false) @PositiveOrZero BigDecimal priceMin,
@@ -88,14 +88,14 @@ public class FlightSearchController {
                         @Parameter(description = "Maksimum fiyat (dahil, örn: 500.00)") @RequestParam(required = false) @PositiveOrZero BigDecimal priceMax,
 
                         // ---- Opsiyonel Kalkış Tarihi Filtreleri ----
-                        @Parameter(description = "Kalkış zamanı alt sınırı (from, yyyy-MM-dd'T'HH:mm:ss)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departureDateFrom,
+                        @Parameter(description = "Kalkış zamanı alt sınırı (from, dd-MM-yyyy'T'HH:mm)", example = "01-06-2026T00:00") @RequestParam(required = false) @DateTimeFormat(pattern = "dd-MM-yyyy'T'HH:mm") LocalDateTime departureDateFrom,
 
-                        @Parameter(description = "Kalkış zamanı üst sınırı (to, yyyy-MM-dd'T'HH:mm:ss)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departureDateTo,
+                        @Parameter(description = "Kalkış zamanı üst sınırı (to, dd-MM-yyyy'T'HH:mm)", example = "01-06-2026T00:00") @RequestParam(required = false) @DateTimeFormat(pattern = "dd-MM-yyyy'T'HH:mm") LocalDateTime departureDateTo,
 
                         // ---- Opsiyonel Varış Tarihi Filtreleri ----
-                        @Parameter(description = "Varış zamanı alt sınırı (from, yyyy-MM-dd'T'HH:mm:ss)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrivalDateFrom,
+                        @Parameter(description = "Varış zamanı alt sınırı (from, dd-MM-yyyy'T'HH:mm)", example = "01-06-2026T00:00") @RequestParam(required = false) @DateTimeFormat(pattern = "dd-MM-yyyy'T'HH:mm") LocalDateTime arrivalDateFrom,
 
-                        @Parameter(description = "Varış zamanı üst sınırı (to, yyyy-MM-dd'T'HH:mm:ss)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrivalDateTo
+                        @Parameter(description = "Varış zamanı üst sınırı (to, dd-MM-yyyy'T'HH:mm)", example = "01-06-2026T00:00") @RequestParam(required = false) @DateTimeFormat(pattern = "dd-MM-yyyy'T'HH:mm") LocalDateTime arrivalDateTo
 
         ) {
                 long startTime = System.currentTimeMillis();
@@ -146,19 +146,19 @@ public class FlightSearchController {
 
                         @Parameter(description = "Varış IATA kodu", example = "COV", required = true) @RequestParam @NotBlank String destination,
 
-                        @Parameter(description = "Kalkış tarihi (yyyy-MM-dd'T'HH:mm:ss)", example = "2026-06-01T00:00:00", required = true) @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departureDate,
+                        @Parameter(description = "Kalkış tarihi (dd-MM-yyyy'T'HH:mm)", example = "01-06-2026T00:00", required = true) @RequestParam @NotNull @DateTimeFormat(pattern = "dd-MM-yyyy'T'HH:mm") LocalDateTime departureDate,
 
                         @Parameter(description = "Minimum fiyat (dahil, örn: 100.00)") @RequestParam(required = false) @PositiveOrZero BigDecimal priceMin,
 
                         @Parameter(description = "Maksimum fiyat (dahil, örn: 500.00)") @RequestParam(required = false) @PositiveOrZero BigDecimal priceMax,
 
-                        @Parameter(description = "Kalkış zamanı alt sınırı (from)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departureDateFrom,
+                        @Parameter(description = "Kalkış zamanı alt sınırı (from)") @RequestParam(required = false) @DateTimeFormat(pattern = "dd-MM-yyyy'T'HH:mm") LocalDateTime departureDateFrom,
 
-                        @Parameter(description = "Kalkış zamanı üst sınırı (to)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departureDateTo,
+                        @Parameter(description = "Kalkış zamanı üst sınırı (to)") @RequestParam(required = false) @DateTimeFormat(pattern = "dd-MM-yyyy'T'HH:mm") LocalDateTime departureDateTo,
 
-                        @Parameter(description = "Varış zamanı alt sınırı (from)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrivalDateFrom,
+                        @Parameter(description = "Varış zamanı alt sınırı (from)") @RequestParam(required = false) @DateTimeFormat(pattern = "dd-MM-yyyy'T'HH:mm") LocalDateTime arrivalDateFrom,
 
-                        @Parameter(description = "Varış zamanı üst sınırı (to)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrivalDateTo
+                        @Parameter(description = "Varış zamanı üst sınırı (to)") @RequestParam(required = false) @DateTimeFormat(pattern = "dd-MM-yyyy'T'HH:mm") LocalDateTime arrivalDateTo
 
         ) {
                 long startTime = System.currentTimeMillis();

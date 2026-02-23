@@ -4,6 +4,9 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.servers.Server;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -24,38 +27,46 @@ import java.util.List;
 @Configuration
 public class OpenApiConfig {
 
-    @Value("${server.port:8080}")
-    private String serverPort;
+        @Value("${server.port:8080}")
+        private String serverPort;
 
-    /**
-     * OpenAPI bean'i: Swagger UI'ın başlık sekmeyi ve genel bilgileri
-     * bu bean'den alır.
-     */
-    @Bean
-    public OpenAPI flightAggregatorOpenApi() {
-        return new OpenAPI()
-                .info(new Info()
-                        .title("Flight Aggregator API")
-                        .description("""
-                                Flight Aggregator, FlightProvider A ve FlightProvider B sağlayıcılarından
-                                uçuş bilgilerini paralel olarak toplar ve iki farklı REST servisi sunar:
+        /**
+         * OpenAPI bean'i: Swagger UI'ın başlık sekmeyi ve genel bilgileri
+         * bu bean'den alır.
+         */
+        @Bean
+        public OpenAPI flightAggregatorOpenApi() {
+                return new OpenAPI()
+                                .info(new Info()
+                                                .title("Flight Aggregator API")
+                                                .description("""
+                                                                Flight Aggregator, FlightProvider A ve FlightProvider B sağlayıcılarından
+                                                                uçuş bilgilerini paralel olarak toplar ve iki farklı REST servisi sunar:
 
-                                - **Service 1** (`/api/v1/flights/search`): Her iki sağlayıcıdan tüm uçuşlar
-                                - **Service 2** (`/api/v1/flights/search/cheapest`): Gruplanmış en ucuz uçuşlar
+                                                                - **Service 1** (`/api/v1/flights/search`): Her iki sağlayıcıdan tüm uçuşlar
+                                                                - **Service 2** (`/api/v1/flights/search/cheapest`): Gruplanmış en ucuz uçuşlar
 
-                                Her istek ve yanıt PostgreSQL'e asenkron olarak loglanır.
-                                Redis ile cache, Resilience4j ile Circuit Breaker koruması mevcuttur.
-                                """)
-                        .version("1.0.0")
-                        .contact(new Contact()
-                                .name("Technoly Case")
-                                .email("dev@technoly.com"))
-                        .license(new License()
-                                .name("MIT")
-                                .url("https://opensource.org/licenses/MIT")))
-                .servers(List.of(
-                        new Server()
-                                .url("http://localhost:" + serverPort)
-                                .description("Geliştirme Sunucusu")));
-    }
+                                                                Her istek ve yanıt PostgreSQL'e asenkron olarak loglanır.
+                                                                Redis ile cache, Resilience4j ile Circuit Breaker koruması mevcuttur.
+                                                                """)
+                                                .version("1.0.0")
+                                                .contact(new Contact()
+                                                                .name("Technoly Case")
+                                                                .email("dev@technoly.com"))
+                                                .license(new License()
+                                                                .name("MIT")
+                                                                .url("https://opensource.org/licenses/MIT")))
+                                .servers(List.of(
+                                                new Server()
+                                                                .url("http://localhost:" + serverPort)
+                                                                .description("Geliştirme Sunucusu")))
+                                .addSecurityItem(new SecurityRequirement().addList("BearerAuth"))
+                                .components(new Components()
+                                                .addSecuritySchemes("BearerAuth",
+                                                                new SecurityScheme()
+                                                                                .name("BearerAuth")
+                                                                                .type(SecurityScheme.Type.HTTP)
+                                                                                .scheme("bearer")
+                                                                                .bearerFormat("JWT")));
+        }
 }

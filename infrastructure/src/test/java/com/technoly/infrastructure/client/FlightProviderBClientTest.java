@@ -53,8 +53,12 @@ class FlightProviderBClientTest {
         mockFlight.setFlightNumber("B456");
         mockFlight.setOrigin("IST");
         mockFlight.setDestination("LHR");
-        mockFlight.setDepartureTime(departureDate.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-        mockFlight.setArrivalTime(departureDate.plusHours(4).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        // Sınıf özelliklerinde (Mock) DATE_FORMATTER kullanarak gelen LocalDateTime
+        // nesnesini,
+        // SOAP servisin beklentisi olan dd-MM-yyyy'T'HH:mm metnine dönüştürüyoruz.
+        DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy'T'HH:mm");
+        mockFlight.setDepartureTime(departureDate.format(DATE_FORMATTER));
+        mockFlight.setArrivalTime(departureDate.plusHours(4).format(DATE_FORMATTER));
         mockFlight.setPrice(new BigDecimal("180.00"));
 
         SearchResult mockResult = new SearchResult();
@@ -81,8 +85,11 @@ class FlightProviderBClientTest {
         SearchRequest capturedRequest = captor.getValue();
         assertThat(capturedRequest.getOrigin()).isEqualTo("IST");
         assertThat(capturedRequest.getDestination()).isEqualTo("LHR");
+        // Adapter üzerinden üretilen SOAP isteğinin tarihlerinin de aynı şekilde
+        // DATE_FORMATTER ile
+        // metne doğru dönüştürülüp gönderildiğini doğruluyoruz.
         assertThat(capturedRequest.getDepartureDate())
-                .isEqualTo(departureDate.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                .isEqualTo(departureDate.format(DATE_FORMATTER));
 
         // Verify metrics
         assertThat(meterRegistry.find("flight.search.provider.latency").timer()).isNotNull();
@@ -131,7 +138,7 @@ class FlightProviderBClientTest {
     }
 
     @Test
-    void fallbackSearchFlights_ShouldReturnEmptyList() {
+    void fallback_ShouldReturnEmptyList() {
         // Arrange
         FlightSearchRequest request = FlightSearchRequest.builder()
                 .origin("IST")
@@ -140,7 +147,7 @@ class FlightProviderBClientTest {
                 .build();
 
         // Act
-        List<FlightDto> result = client.fallbackSearchFlights(request, new RuntimeException("Circuit Breaker Open"));
+        List<FlightDto> result = client.fallback(request, new RuntimeException("Circuit Breaker Open"));
 
         // Assert
         assertThat(result).isEmpty();

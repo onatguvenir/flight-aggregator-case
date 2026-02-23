@@ -54,7 +54,7 @@ public class FlightSearchRequest {
     /** Kalkış tarihi: gelecekte bir tarih olmalı */
     @NotNull(message = "Kalkış tarihi (departureDate) null olamaz")
     @Future(message = "Kalkış tarihi gelecekte bir tarih olmalıdır")
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime departureDate;
 
     // ===========================
@@ -86,7 +86,7 @@ public class FlightSearchRequest {
      * Bu değerden önce kalkan uçuşlar filtrelenir.
      * null ise alt sınır uygulanmaz.
      */
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime departureDateFrom;
 
     /**
@@ -94,7 +94,7 @@ public class FlightSearchRequest {
      * Bu değerden sonra kalkan uçuşlar filtrelenir.
      * null ise üst sınır uygulanmaz.
      */
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime departureDateTo;
 
     /**
@@ -102,7 +102,7 @@ public class FlightSearchRequest {
      * Bu değerden önce gelen uçuşlar filtrelenir.
      * null ise alt sınır uygulanmaz.
      */
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime arrivalDateFrom;
 
     /**
@@ -110,7 +110,7 @@ public class FlightSearchRequest {
      * Bu değerden sonra gelen uçuşlar filtrelenir.
      * null ise üst sınır uygulanmaz.
      */
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime arrivalDateTo;
 
     /**

@@ -95,7 +95,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST,
                 "'" + ex.getName() + "' parametresi için geçersiz değer: '" + ex.getValue() +
-                        "'. Beklenen format: yyyy-MM-dd'T'HH:mm:ss");
+                        "'. Beklenen format: dd-MM-yyyy'T'HH:mm");
         problem.setTitle("Parametre Hatası");
         problem.setType(URI.create("https://api.technoly.com/errors/invalid-parameter"));
 
@@ -110,6 +110,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleGeneral(Exception ex) {
         log.error("Beklenmeyen hata: {}", ex.getMessage(), ex);
+        ex.printStackTrace();
 
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR,
