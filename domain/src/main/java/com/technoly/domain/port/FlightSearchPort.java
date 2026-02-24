@@ -6,19 +6,19 @@ import com.technoly.domain.model.FlightSearchRequest;
 import java.util.List;
 
 /**
- * Uçuş aramasını tüm sağlayıcılar (provider'lar) üzerinden orkestre eden Port.
+ * Port that orchestrates flight searches across all providers.
  *
- * Bu interface, Hexagonal Architecture / Ports & Adapters yaklaşımında
- * application katmanının "dış dünya" detaylarına (SOAP, HTTP, vendor DTO'ları)
- * bağımlı olmadan uçuş araması yapabilmesini sağlar.
+ * In the Hexagonal Architecture / Ports & Adapters approach, this interface
+ * allows the application layer to search for flights without depending on
+ * "external world" details (SOAP, HTTP, vendor DTOs).
  *
- * Beklenen davranış:
- * - Provider'lardan gelen sonuçlar domain'de kullandığımız ortak modele (FlightDto)
- *   normalize edilmelidir.
- * - Tek bir provider hata verdiğinde tüm arama akışı çökmez; mümkünse
- *   "kısmi başarı" ile diğer provider sonuçları döndürülür.
- * - Hata/sonuç yok durumunda null yerine boş liste dönülmesi tercih edilir
- *   (null-safety).
+ * Expected behavior:
+ * - Results coming from providers should be normalized to the common model
+ * (FlightDto) we use in the domain.
+ * - When a single provider fails, the entire search flow should not crash;
+ * if possible, other provider results are returned with "partial success".
+ * - Prefer returning an empty list instead of null in case of error/no result
+ * (null-safety).
  */
 public interface FlightSearchPort {
     List<FlightDto> searchAllFlights(FlightSearchRequest request);

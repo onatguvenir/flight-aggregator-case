@@ -21,11 +21,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 /**
- * FlightAdapter Unit Testi
+ * FlightAdapter Unit Test
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@DisplayName("FlightAdapter Unit Testleri")
+@DisplayName("FlightAdapter Unit Tests")
 class FlightAdapterTest {
 
     @Mock
@@ -53,7 +53,7 @@ class FlightAdapterTest {
     }
 
     @Test
-    @DisplayName("Her iki sağlayıcıya tam olarak bir kez çağrı yapılır")
+    @DisplayName("Should call both providers exactly once")
     void shouldCallBothProvidersOnce() {
         when(providerA.searchFlights(testRequest)).thenReturn(new ArrayList<>());
         when(providerB.searchFlights(testRequest)).thenReturn(new ArrayList<>());
@@ -65,7 +65,7 @@ class FlightAdapterTest {
     }
 
     @Test
-    @DisplayName("Her iki sağlayıcıdan gelen sonuçlar birleştirilir")
+    @DisplayName("Should merge results from both providers")
     void shouldMergeFlightsFromBothProviders() {
         List<FlightDto> providerAFlights = createFlights(3, "PROVIDER_A");
         List<FlightDto> providerBFlights = createFlights(4, "PROVIDER_B");
@@ -79,7 +79,7 @@ class FlightAdapterTest {
     }
 
     @Test
-    @DisplayName("Bir sağlayıcı boş liste döndürdüğünde diğerinin sonuçları döner")
+    @DisplayName("Should return results from one provider when the other returns empty")
     void shouldReturnResultsWhenOneProviderReturnsEmpty() {
         when(providerA.searchFlights(testRequest)).thenReturn(new ArrayList<>());
         when(providerB.searchFlights(testRequest)).thenReturn(createFlights(5, "PROVIDER_B"));
@@ -91,7 +91,7 @@ class FlightAdapterTest {
     }
 
     @Test
-    @DisplayName("Bir sağlayıcı exception fırlattığında diğerinin sonuçları döner")
+    @DisplayName("Should return results from other provider when one throws exception")
     void shouldReturnOtherProviderResultsWhenOneThrowsException() {
         when(providerA.searchFlights(testRequest)).thenThrow(new RuntimeException("ProviderA is down"));
         when(providerB.searchFlights(testRequest)).thenReturn(createFlights(3, "PROVIDER_B"));
@@ -102,7 +102,7 @@ class FlightAdapterTest {
     }
 
     @Test
-    @DisplayName("Her iki sağlayıcı boş döndürürdüğünde boş liste döner")
+    @DisplayName("Should return empty list when both providers return empty")
     void shouldReturnEmptyListWhenBothProvidersReturnEmpty() {
         when(providerA.searchFlights(testRequest)).thenReturn(new ArrayList<>());
         when(providerB.searchFlights(testRequest)).thenReturn(new ArrayList<>());
@@ -113,7 +113,7 @@ class FlightAdapterTest {
     }
 
     @Test
-    @DisplayName("Gelecek timeout'a düştüğünde exception handle edilir boş liste döner")
+    @DisplayName("Future timeout should handle exception and return empty list")
     void shouldHandleTimeoutFromFutures() {
         when(providerA.searchFlights(testRequest)).thenAnswer(invocation -> {
             Thread.sleep(15000); // Trigger orTimeout(10, TimeUnit.SECONDS)

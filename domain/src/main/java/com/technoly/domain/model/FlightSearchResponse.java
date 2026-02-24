@@ -11,16 +11,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * REST API'den dönen uçuş arama yanıtı modeli.
+ * Flight search response model returned from REST API.
  *
- * Hem "tüm uçuşlar" hem de "en ucuz gruplanmış" servisleri bu response'u
- * kullanır.
- * totalCount, istemcinin sayfalama veya istatistik için kullanabileceği meta
- * bilgidir.
+ * Both "all flights" and "cheapest grouped" services use this response.
+ * totalCount is meta information that the client can use for pagination or
+ * statistics.
  *
- * Static factory methods ile tutarlı response oluşturma:
+ * Consistent response creation with Static factory methods:
  * - FlightSearchResponse.of(flights): normal response
- * - FlightSearchResponse.empty(): hata veya sonuç yok durumu
+ * - FlightSearchResponse.empty(): error or no result case
  */
 @Data
 @Builder
@@ -28,21 +27,21 @@ import java.util.List;
 @AllArgsConstructor
 public class FlightSearchResponse {
 
-    /** Dönen uçuş listesi */
+    /** Returned flight list */
     @Builder.Default
     private List<FlightDto> flights = new ArrayList<>();
 
-    /** Toplam uçuş sayısı (UI pagination için) */
+    /** Total number of flights (for UI pagination) */
     private int totalCount;
 
-    /** Aramanın yapıldığı zaman damgası */
+    /** Timestamp when the search was performed */
     @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime searchedAt;
 
     // ---- Static Factory Methods ----
 
     /**
-     * Başarılı yanıt: uçuş listesiyle birlikte
+     * Successful response: with flight list
      */
     public static FlightSearchResponse of(List<FlightDto> flights) {
         return FlightSearchResponse.builder()
@@ -53,7 +52,7 @@ public class FlightSearchResponse {
     }
 
     /**
-     * Boş yanıt: sağlayıcılardan sonuç gelmedi veya tümü hata verdi
+     * Empty response: no result from providers or all failed
      */
     public static FlightSearchResponse empty() {
         return FlightSearchResponse.builder()

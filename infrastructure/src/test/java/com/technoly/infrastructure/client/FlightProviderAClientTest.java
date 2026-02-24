@@ -58,9 +58,9 @@ class FlightProviderAClientTest {
         mockFlight.setFlightNumber("A123");
         mockFlight.setOrigin("IST");
         mockFlight.setDestination("LHR");
-        // Sınıf özelliklerinde (Mock) DATE_FORMATTER kullanarak gelen LocalDateTime
-        // nesnesini,
-        // SOAP servisin beklentisi olan dd-MM-yyyy'T'HH:mm metnine dönüştürüyoruz.
+        // Using DATE_FORMATTER in class properties (Mock) to convert incoming
+        // LocalDateTime
+        // object to the string expected by the SOAP service "dd-MM-yyyy'T'HH:mm".
         DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy'T'HH:mm");
         mockFlight.setDepartureTime(departureDate.format(DATE_FORMATTER));
         mockFlight.setArrivalTime(departureDate.plusHours(4).format(DATE_FORMATTER));
@@ -90,9 +90,9 @@ class FlightProviderAClientTest {
         SearchRequest capturedRequest = captor.getValue();
         assertThat(capturedRequest.getOrigin()).isEqualTo("IST");
         assertThat(capturedRequest.getDestination()).isEqualTo("LHR");
-        // Adapter üzerinden üretilen SOAP isteğinin tarihlerinin de aynı şekilde
-        // DATE_FORMATTER ile
-        // metne doğru dönüştürülüp gönderildiğini doğruluyoruz.
+        // We verify that the dates of the SOAP request generated via Adapter are
+        // correctly
+        // converted to text with DATE_FORMATTER and sent in the same way.
         assertThat(capturedRequest.getDepartureDate())
                 .isEqualTo(departureDate.format(DATE_FORMATTER));
 

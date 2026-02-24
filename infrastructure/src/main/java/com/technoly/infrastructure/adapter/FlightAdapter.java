@@ -16,20 +16,21 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * FlightSearchPort implementasyonu: provider orkestrasyonu yapan adapter.
+ * FlightSearchPort implementation: adapter performing provider orchestration.
  *
- * Sorumluluk:
- * - Spring tarafından inject edilen tüm {@link FlightProviderPort} implementasyonlarını
- *   (ör. ProviderA, ProviderB) tek bir "arama" operasyonu altında birleştirir.
- * - Provider çağrılarını paralel çalıştırır ve sonuçları tek listede toplar.
+ * Responsibility:
+ * - Combines all {@link FlightProviderPort} implementations injected by Spring
+ * (e.g., ProviderA, ProviderB) under a single "search" operation.
+ * - Runs provider calls in parallel and gathers results in a single list.
  *
- * Tasarım notları:
- * - {@code List<FlightProviderPort>} injection → yeni bir provider eklemek için
- *   sadece yeni bir {@code @Component} implementasyon eklemek yeterli (OCP).
- * - "Kısmi başarı" yaklaşımı: Bir provider hata verirse diğer provider sonuçları
- *   yine de dönülebilir; bu yüzden hatada boş listeye düşülür.
- * - Timeout: Provider'ın takılı kalması tüm isteği bloke etmesin diye her
- *   provider çağrısına süre sınırı uygulanır.
+ * Design notes:
+ * - {@code List<FlightProviderPort>} injection → to add a new provider,
+ * adding a new {@code @Component} implementation is sufficient (OCP).
+ * - "Partial success" approach: If one provider fails, results from other
+ * providers
+ * can still be returned; therefore, it falls back to an empty list on error.
+ * - Timeout: A time limit is applied to each provider call so that a stuck
+ * provider does not block the entire request.
  */
 @Slf4j
 @Component
@@ -38,32 +39,34 @@ class FlightAdapter implements FlightSearchPort {
 
     private final List<FlightProviderPort> flightProviders;
     /**
-     * Provider çağrılarını paralelleştirmek için kullanılan thread pool.
+     * Thread pool used to parallelize provider calls.
      *
-     * Not: Bu proje örneğinde adapter kendi executor'ını oluşturuyor.
-     * Üretim sistemlerinde genellikle {@code @Bean TaskExecutor} üzerinden yönetmek,
-     * shutdown/lifecycle yönetimini Spring'e bırakmak daha sağlıklıdır.
+     * Note: In this project example, the adapter creates its own executor.
+     * In production systems, it is generally healthier to manage it via
+     * {@code @Bean TaskExecutor},
+     * leaving shutdown/lifecycle management to Spring.
      */
     private final ExecutorService executorService = Executors.newFixedThreadPool(4);
 
     @Override
     public List<FlightDto> searchAllFlights(FlightSearchRequest request) {
-        log.info("Paralel SOAP araması (Adapter): {} → {}", request.getOrigin(), request.getDestination());
+        log.info("Parallel SOAP search (Adapter): {} → {}", request.getOrigin(), request.getDestination());
 
         List<CompletableFuture<List<FlightDto>>> futures = flightProviders.stream()
                 .map(provider -> CompletableFuture
                         .supplyAsync(() -> searchWithProvider(provider, request), executorService)
-                        // Provider bazında üst süre sınırı: bu süre aşılırsa Exception'a düşer
+                        // Upper time limit per provider: falls to Exception if exceeded
                         .orTimeout(10, TimeUnit.SECONDS)
                         .exceptionally(ex -> {
-                            // Bu noktada "kısmi başarı" için hata yutulur ve boş listeye düşülür.
-                            // Böylece diğer provider'ların sonuçları yine de dönebilir.
-                            log.error("[{}] hata: {}", provider.getProviderName(), ex.getMessage());
+                            // At this point, the error is swallowed and back to an empty list for "partial
+                            // success".
+                            // Thus, results from other providers can still be returned.
+                            log.error("[{}] error: {}", provider.getProviderName(), ex.getMessage());
                             return new ArrayList<>();
                         }))
                 .toList();
 
-        // join(): tüm futures tamamlanana kadar bekler (ya sonuç ya da boş liste)
+        // join(): waits until all futures are complete (either result or empty list)
         return futures.stream()
                 .map(CompletableFuture::join)
                 .flatMap(List::stream)
@@ -72,12 +75,15 @@ class FlightAdapter implements FlightSearchPort {
 
     private List<FlightDto> searchWithProvider(FlightProviderPort provider, FlightSearchRequest request) {
         try {
-            // Provider implementasyonu kendi içinde Resilience4j (retry/cb/bulkhead) uyguluyor olabilir.
-            // Burada amaç: tek provider hatasının tüm akışı bozmamasını sağlamak.
+            // Provider implementation itself may be applying Resilience4j
+            // (retry/cb/bulkhead).
+            // The goal here: to ensure a single provider error doesn't break the entire
+            // flow.
             log.info("searchWithProvider Request: {}", request.toString());
             return provider.searchFlights(request);
         } catch (Exception e) {
-            log.error("[{}] Beklenmeyen hata: {} - Request: {}", provider.getProviderName(), e.getMessage(),request.toString());
+            log.error("[{}] Unexpected error: {} - Request: {}", provider.getProviderName(), e.getMessage(),
+                    request.toString());
             return new ArrayList<>();
         }
     }

@@ -11,40 +11,40 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * Uçuş Aggregator Servisi - Service 1
+ * Flight Aggregator Service - Service 1
  *
- * FlightSearchPort (Adapter) üzerinden verileri toplar
- * ve FlightFilterService ile in-memory filtreleri uygular.
+ * Collects data via FlightSearchPort (Adapter)
+ * and applies in-memory filters via FlightFilterService.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class FlightAggregatorService {
 
-    private final FlightSearchPort flightSearchPort;
-    private final FlightFilterService flightFilterService;
+        private final FlightSearchPort flightSearchPort;
+        private final FlightFilterService flightFilterService;
 
-    @Cacheable(value = "flightSearch", key = "#request.origin + '_' + #request.destination + '_' + #request.departureDate"
-            + " + '_' + #request.priceMin + '_' + #request.priceMax"
-            + " + '_' + #request.departureDateFrom + '_' + #request.departureDateTo"
-            + " + '_' + #request.arrivalDateFrom + '_' + #request.arrivalDateTo", unless = "#result.isEmpty()")
-    public List<FlightDto> searchAllFlights(FlightSearchRequest request) {
-        log.info("Uçuş araması tetiklendi: {} → {} @ {} [filtreler: {}]",
-                request.getOrigin(), request.getDestination(), request.getDepartureDate(),
-                request.hasActiveFilters() ? "aktif" : "yok");
+        @Cacheable(value = "flightSearch", key = "#request.origin + '_' + #request.destination + '_' + #request.departureDate"
+                        + " + '_' + #request.priceMin + '_' + #request.priceMax"
+                        + " + '_' + #request.departureDateFrom + '_' + #request.departureDateTo"
+                        + " + '_' + #request.arrivalDateFrom + '_' + #request.arrivalDateTo", unless = "#result.isEmpty()")
+        public List<FlightDto> searchAllFlights(FlightSearchRequest request) {
+                log.info("Flight search triggered: {} → {} @ {} [filters: {}]",
+                                request.getOrigin(), request.getDestination(), request.getDepartureDate(),
+                                request.hasActiveFilters() ? "active" : "none");
 
-        long startTime = System.currentTimeMillis();
+                long startTime = System.currentTimeMillis();
 
-        // Arabirime üzerinden ham (tüm sağlayıcılardan birleştirilmiş) uçuşları al
-        List<FlightDto> allFlights = flightSearchPort.searchAllFlights(request);
+                // Get raw (merged from all providers) flights via the interface
+                List<FlightDto> allFlights = flightSearchPort.searchAllFlights(request);
 
-        // In-memory filtreler uygula (Seçenek A)
-        List<FlightDto> filtered = flightFilterService.applyFilters(allFlights, request);
+                // Apply in-memory filters (Option A)
+                List<FlightDto> filtered = flightFilterService.applyFilters(allFlights, request);
 
-        long durationMs = System.currentTimeMillis() - startTime;
-        log.info("Arama tamamlandı: ham={}, filtrelenmiş={}, süre={}ms",
-                allFlights.size(), filtered.size(), durationMs);
+                long durationMs = System.currentTimeMillis() - startTime;
+                log.info("Search completed: raw={}, filtered={}, duration={}ms",
+                                allFlights.size(), filtered.size(), durationMs);
 
-        return filtered;
-    }
+                return filtered;
+        }
 }

@@ -7,29 +7,29 @@ import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import java.io.IOException;
 
 /**
- * PII Veri Maskeleme Serializer
+ * PII Data Masking Serializer
  *
- * Jackson @JsonSerialize mekanizması ile entegre çalışır.
+ * Integrates with Jackson's @JsonSerialize mechanism.
  * 
- * @Masked annotasyonu ile işaretlenen alanlara otomatik uygulanır.
+ * Automatically applies to fields annotated with @Masked.
  *
- *         Infrastructure modülünde bulunur çünkü jackson-databind StdSerializer
- *         domain modülünün annotation processor'u (Lombok) ile uyumsuzluk
- *         yaratır.
+ * Located in the infrastructure module because jackson-databind StdSerializer
+ * creates an incompatibility with the domain module's annotation processor
+ * (Lombok).
  *
- *         Maskeleme Kuralları:
- *         - null → null (değişmez)
- *         - 1-4 karakter → "***" (tamamı gizlenir)
- *         - 5+ karakter → ilk 2 + "***" + son 2 görünür
+ * Masking Rules:
+ * - null → null (unchanged)
+ * - 1-4 characters → "***" (fully hidden)
+ * - 5+ characters → first 2 + "***" + last 2 visible
  *
- *         Örnekler:
- *         "Ali" → "***"
- *         "John Doe" → "Jo***oe"
- *         "+905551234567" → "+9***67"
- *         "john@ex.com" → "jo***om"
+ * Examples:
+ * "Ali" → "***"
+ * "John Doe" → "Jo***oe"
+ * "+905551234567" → "+9***67"
+ * "john@ex.com" → "jo***om"
  *
- *         PII Alanları (KVKK / GDPR kapsamında):
- *         - passengerName, email, phone, passportNo
+ * PII Fields (under KVKK / GDPR context):
+ * - passengerName, email, phone, passportNo
  */
 public class MaskingSerializer extends StdSerializer<String> {
 
@@ -53,21 +53,21 @@ public class MaskingSerializer extends StdSerializer<String> {
     }
 
     /**
-     * Maskeleme mantığı.
-     * Pure function: aynı girdi daima aynı çıktı → test edilebilirlik.
+     * Masking logic.
+     * Pure function: same input always gives same output → testability.
      *
-     * @param value Maskelenecek string
-     * @return Maskelenmiş string
+     * @param value String to be masked
+     * @return Masked string
      */
     public static String mask(String value) {
         if (value == null)
             return null;
         int length = value.length();
-        // Çok kısa değerlerin tamamı gizlenir
+        // Very short values are fully hidden
         if (length <= VISIBLE_CHARS * 2) {
             return MASK;
         }
-        // Başından VISIBLE_CHARS karakter + MASK + sondan VISIBLE_CHARS karakter
+        // First VISIBLE_CHARS chars + MASK + last VISIBLE_CHARS chars
         return value.substring(0, VISIBLE_CHARS)
                 + MASK
                 + value.substring(length - VISIBLE_CHARS);

@@ -12,38 +12,38 @@ import java.util.List;
 /**
  * API Log JPA Repository
  *
- * JpaRepository ile PagingAndSortingRepository birleşik olarak gelmektedir.
- * Eklenen Page<> tabanlı metodlar production senaryolarında OOM (Out of
- * Memory) riskini ortadan kaldırır: tüm tabloyu belleğe çekmek yerine
- * sayfa sayfa veri okunur.
+ * PagingAndSortingRepository comes integrated with JpaRepository.
+ * The added Page<> based methods eliminate the OOM (Out of Memory) risk
+ * in production scenarios: instead of pulling the whole table into memory,
+ * data is read page by page.
  *
- * findBy...(Pageable) metodları: Spring Data JPA, Pageable'dan LIMIT/OFFSET
- * ve ORDER BY SQL cümlelerini otomatik üretir.
+ * findBy...(Pageable) methods: Spring Data JPA automatically generates
+ * LIMIT/OFFSET and ORDER BY SQL statements from Pageable.
  */
 @Repository
 public interface ApiLogRepository extends JpaRepository<ApiLogEntity, Long> {
 
     /**
-     * Belirli bir endpoint için tüm log kayıtlarını döner.
-     * SQL eşdeğeri: SELECT * FROM api_logs WHERE endpoint = ?
+     * Returns all log records for a specific endpoint.
+     * SQL equivalent: SELECT * FROM api_logs WHERE endpoint = ?
      */
     List<ApiLogEntity> findByEndpoint(String endpoint);
 
     /**
-     * Belirli bir endpoint için sayfalı log kayıtlarını döner.
-     * Örnek: ?page=0&size=20&sort=createdAt,desc
+     * Returns paginated log records for a specific endpoint.
+     * Example: ?page=0&size=20&sort=createdAt,desc
      */
     Page<ApiLogEntity> findByEndpoint(String endpoint, Pageable pageable);
 
     /**
-     * Zaman aralığında oluşturulan log kayıtlarını döner.
-     * SQL eşdeğeri: SELECT * FROM api_logs WHERE created_at BETWEEN ? AND ?
+     * Returns log records created within a time range.
+     * SQL equivalent: SELECT * FROM api_logs WHERE created_at BETWEEN ? AND ?
      */
     List<ApiLogEntity> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
     /**
-     * Belirli bir HTTP durum koduna sahip kayıtları döner.
-     * Örnek: Hatalı çağrıları (statusCode >= 400) izlemek için.
+     * Returns records with a specific HTTP status code.
+     * Example: To track failed calls (statusCode >= 400).
      */
     List<ApiLogEntity> findByStatusCode(Integer statusCode);
 }

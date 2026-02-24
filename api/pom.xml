@@ -14,20 +14,20 @@
     <description>REST API layer - entry point for the modular monolith</description>
 
     <!--
-        API MODÜLÜ (Entry Point)
+        API MODULE (Entry Point)
         ==========================
-        Bu modül, modüler monolitin tek deployable artifact'ıdır.
-        - @SpringBootApplication burada yer alır
+        This module is the single deployable artifact of the modular monolith.
+        - @SpringBootApplication is located here
         - REST controllers
-        - Swagger/OpenAPI konfigürasyonu
+        - Swagger/OpenAPI configuration
         - Exception handlers
-        - application.yml konfigürasyonu
+        - application.yml configuration
 
-        spring-boot-maven-plugin sadece bu modülde aktif,
-        çünkü sadece bu modül executable JAR üretir.
+        spring-boot-maven-plugin is only active in this module,
+        because only this module produces the executable JAR.
     -->
     <dependencies>
-        <!-- Tüm modüller bu modüle dahil -->
+        <!-- All modules are included in this module -->
         <dependency>
             <groupId>com.technoly</groupId>
             <artifactId>domain</artifactId>
@@ -41,25 +41,25 @@
             <artifactId>application</artifactId>
         </dependency>
 
-        <!-- Spring Web: REST controller'lar için -->
+        <!-- Spring Web: for REST controllers -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Bean Validation: Request DTO validation için -->
+        <!-- Bean Validation: for Request DTO validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- Actuator: /actuator/health, /actuator/metrics, /actuator/prometheus -->
+        <!-- Actuator: for /actuator/health, /actuator/metrics, /actuator/prometheus -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- Micrometer Prometheus: /actuator/prometheus endpoint'i için -->
+        <!-- Micrometer Prometheus: for /actuator/prometheus endpoint -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
@@ -73,8 +73,8 @@
 
         <!-- ==========================================================-->
         <!-- SECURITY: JWT / OAuth2 Resource Server                      -->
-        <!-- Spring Security: HTTP filter zinciri + method security       -->
-        <!-- oauth2-resource-server: JWT Bearer token doğrulaması         -->
+        <!-- Spring Security: HTTP filter chain + method security         -->
+        <!-- oauth2-resource-server: JWT Bearer token validation          -->
         <!-- ==========================================================-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -87,7 +87,7 @@
 
         <!-- ==========================================================-->
         <!-- ELK: Logstash JSON log encoder                              -->
-        <!-- JSON formatında yapılandırılmış log → Logstash → Elastic    -->
+        <!-- Structured log in JSON format → Logstash → Elastic          -->
         <!-- ==========================================================-->
         <dependency>
             <groupId>net.logstash.logback</groupId>
@@ -95,8 +95,8 @@
             <version>7.4</version>
         </dependency>
 
-        <!-- ===== TEST BAĞIMLILIKLARI ===== -->
-        <!-- Spring Security Test: MockMvc ile güvenli endpoint testleri -->
+        <!-- ===== TEST DEPENDENCIES ===== -->
+        <!-- Spring Security Test: for secure endpoint testing with MockMvc -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
@@ -109,14 +109,14 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- WireMock: SOAP provider'ları mock etmek için -->
+        <!-- WireMock: for mocking SOAP providers -->
         <dependency>
             <groupId>org.wiremock</groupId>
             <artifactId>wiremock-standalone</artifactId>
             <scope>test</scope>
         </dependency>
 
-        <!-- Spring Boot Test: MockMvc, @SpringBootTest için -->
+        <!-- Spring Boot Test: for MockMvc, @SpringBootTest -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -127,9 +127,9 @@
     <build>
         <plugins>
             <!--
-                spring-boot-maven-plugin yalnızca api modülünde aktif.
-                Bu plugin 'repackage' goal'ü ile tüm bağımlılıkları
-                içeren executable fat-JAR oluşturur.
+                spring-boot-maven-plugin is only active in the api module.
+                This plugin with the 'repackage' goal creates an executable
+                fat-JAR containing all dependencies.
             -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>

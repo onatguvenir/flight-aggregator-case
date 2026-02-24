@@ -22,17 +22,17 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.*;
 
 /**
- * ApiLogService Unit Testi
+ * ApiLogService Unit Test
  *
- * @Async ve @Transactional kendi testlerinde zorlanır (Spring AOP proxy
- *        gerektirir).
- *        Burada business logic'i (JSON serialize, entity yapısı) test ediyoruz,
- *        annotation davranışını değil. Integration testler onu sağlar.
+ * @Async and @Transactional are tricky in their own tests (requires Spring AOP
+ *        proxy).
+ *        Here we test the business logic (JSON serialize, entity structure),
+ *        not the annotation behavior. Integration tests cover that.
  *
- *        @ExtendWith(MockitoExtension) → Spring context yok, saf Mockito
+ *        @ExtendWith(MockitoExtension) → No Spring context, pure Mockito
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("ApiLogService Unit Testleri")
+@DisplayName("ApiLogService Unit Tests")
 class ApiLogServiceTest {
 
     @Mock
@@ -41,7 +41,7 @@ class ApiLogServiceTest {
     @InjectMocks
     private ApiLogService apiLogService;
 
-    // Gerçek ObjectMapper kullan (mock değil): JSON serialize test edilsin
+    // Use a real ObjectMapper (not mock): to test JSON serialization
     private final ObjectMapper objectMapper = new ObjectMapper()
             .findAndRegisterModules();
 
@@ -49,13 +49,13 @@ class ApiLogServiceTest {
 
     @BeforeEach
     void setUp() {
-        // @InjectMocks ObjectMapper'ı inject edemez (final alan değil Mockito hedefi)
-        // Bu yüzden gerçek ObjectMapper ile manual oluşturuyoruz
+        // @InjectMocks cannot inject ObjectMapper (not a final field target of Mockito)
+        // Therefore, we manually create it with a real ObjectMapper
         serviceWithRealMapper = new ApiLogService(apiLogRepository, objectMapper);
     }
 
     @Test
-    @DisplayName("Başarılı log kaydı: repository.save çağrılır")
+    @DisplayName("Successful log entry: repository.save is called")
     void logApiCall_success_callsRepositorySave() {
         FlightSearchRequest request = FlightSearchRequest.builder()
                 .origin("IST").destination("COV")
@@ -65,7 +65,7 @@ class ApiLogServiceTest {
 
         serviceWithRealMapper.logApiCall("/api/v1/flights/search", request, response, 200, 150L);
 
-        // save çağrıldı mı doğrula
+        // verify save is called
         ArgumentCaptor<ApiLogEntity> captor = ArgumentCaptor.forClass(ApiLogEntity.class);
         verify(apiLogRepository, times(1)).save(captor.capture());
 
@@ -78,25 +78,25 @@ class ApiLogServiceTest {
     }
 
     @Test
-    @DisplayName("Null request ile de exception fırlatmaz (fire-and-forget)")
+    @DisplayName("Does not throw exception even with null request (fire-and-forget)")
     void logApiCall_withNullRequest_doesNotThrow() {
         assertThatCode(() -> serviceWithRealMapper.logApiCall("/endpoint", null, null, 200, 0L))
                 .doesNotThrowAnyException();
     }
 
     @Test
-    @DisplayName("Repository hatası → exception fırlatılmaz, log yazılır")
+    @DisplayName("Repository error → exception is not thrown, log is written")
     void logApiCall_repositoryThrows_doesNotPropagateException() {
-        when(apiLogRepository.save(any())).thenThrow(new RuntimeException("DB bağlantı hatası"));
+        when(apiLogRepository.save(any())).thenThrow(new RuntimeException("DB connection error"));
 
         assertThatCode(() -> serviceWithRealMapper.logApiCall("/endpoint", "req", "res", 500, 100L))
                 .doesNotThrowAnyException();
     }
 
     @Test
-    @DisplayName("Serialize edilemeyen nesne → fallback string kullanılır")
+    @DisplayName("Unserializable object → fallback string is used")
     void logApiCall_serializeError_usesFallback() {
-        // ObjectMapper mock'la ve hata ver
+        // Mock ObjectMapper and throw error
         ObjectMapper failingMapper = mock(ObjectMapper.class);
         ApiLogService failingService = new ApiLogService(apiLogRepository, failingMapper);
         try {
@@ -106,7 +106,7 @@ class ApiLogServiceTest {
         } catch (Exception e) {
             /* mock setup */ }
 
-        // Exception fırlatmamalı — seriale hatasını absorbe eder
+        // Should not throw exception — absorbs serialization error
         assertThatCode(() -> failingService.logApiCall("/endpoint", new Object(), null, 200, 10L))
                 .doesNotThrowAnyException();
     }

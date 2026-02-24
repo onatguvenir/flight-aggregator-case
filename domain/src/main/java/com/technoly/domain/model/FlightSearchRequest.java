@@ -14,24 +14,24 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * REST API'ye gelen uçuş arama isteği modeli.
+ * Flight search request model coming to the REST API.
  *
- * Bean Validation (@NotBlank, @NotNull, @Future) ile input doğrulama.
+ * Input validation with Bean Validation (@NotBlank, @NotNull, @Future).
  *
- * --- Zorunlu Alanlar ---
- * origin, destination, departureDate: Her iki endpoint için zorunlu.
+ * --- Mandatory Fields ---
+ * origin, destination, departureDate: Mandatory for both endpoints.
  *
- * --- Opsiyonel Filtre Alanları (Seçenek A: in-memory) ---
- * Bu alanlar FlightFilterService tarafından SOAP çağrısı sonrasında
- * Stream + Predicate zinciri ile uygulanır. Provider'lara iletilmez.
+ * --- Optional Filter Fields (Option A: in-memory) ---
+ * These fields are applied by FlightFilterService after the SOAP call
+ * via Stream + Predicate chain. They are not sent to providers.
  *
- * Tasarım Kararı (null = filtre yok):
- * - priceMin = null → fiyat alt sınırı kontrolü yapılmaz
- * - departureDateFrom = null → kalkış tarihi alt sınırı kontrolü yapılmaz
- * - vb.
+ * Design Decision (null = no filter):
+ * - priceMin = null → no minimum price limit check
+ * - departureDateFrom = null → no departure date lower limit check
+ * - etc.
  *
- * Bu "opt-in filter" yaklaşımı, geriye dönük uyumluluk sağlar:
- * Mevcut client'lar filtre parametresi göndermeden çalışmaya devam eder.
+ * This "opt-in filter" approach provides backward compatibility:
+ * Existing clients continue to work without sending filter parameters.
  */
 @Data
 @Builder
@@ -40,84 +40,84 @@ import java.time.LocalDateTime;
 public class FlightSearchRequest {
 
     // ===========================
-    // Zorunlu Arama Parametreleri
+    // Mandatory Search Parameters
     // ===========================
 
-    /** Kalkış havaalanı IATA kodu (örn: IST) */
-    @NotBlank(message = "Kalkış yeri (origin) boş olamaz")
+    /** Departure airport IATA code (e.g., IST) */
+    @NotBlank(message = "Origin cannot be blank")
     private String origin;
 
-    /** Varış havaalanı IATA kodu (örn: COV) */
-    @NotBlank(message = "Varış yeri (destination) boş olamaz")
+    /** Arrival airport IATA code (e.g., COV) */
+    @NotBlank(message = "Destination cannot be blank")
     private String destination;
 
-    /** Kalkış tarihi: gelecekte bir tarih olmalı */
-    @NotNull(message = "Kalkış tarihi (departureDate) null olamaz")
-    @Future(message = "Kalkış tarihi gelecekte bir tarih olmalıdır")
+    /** Departure date: must be a future date */
+    @NotNull(message = "Departure date cannot be null")
+    @Future(message = "Departure date must be a future date")
     @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime departureDate;
 
     // ===========================
-    // Opsiyonel Fiyat Filtreleri
+    // Optional Price Filters
     // ===========================
 
     /**
-     * Minimum fiyat filtresi (dahil).
-     * null ise alt sınır uygulanmaz.
+     * Minimum price filter (inclusive).
+     * If null, lower limit is not applied.
      * 
-     * @PositiveOrZero: 0 veya pozitif ondalıklı sayı beklenir.
+     * @PositiveOrZero: 0 or positive decimal number expected.
      */
-    @PositiveOrZero(message = "Minimum fiyat 0 veya pozitif olmalıdır")
+    @PositiveOrZero(message = "Minimum price must be 0 or positive")
     private BigDecimal priceMin;
 
     /**
-     * Maksimum fiyat filtresi (dahil).
-     * null ise üst sınır uygulanmaz.
+     * Maximum price filter (inclusive).
+     * If null, upper limit is not applied.
      */
-    @PositiveOrZero(message = "Maksimum fiyat 0 veya pozitif olmalıdır")
+    @PositiveOrZero(message = "Maximum price must be 0 or positive")
     private BigDecimal priceMax;
 
     // ===========================
-    // Opsiyonel Tarih Filtreleri
+    // Optional Date Filters
     // ===========================
 
     /**
-     * Kalkış zamanı alt sınırı (inclusive: "from").
-     * Bu değerden önce kalkan uçuşlar filtrelenir.
-     * null ise alt sınır uygulanmaz.
+     * Departure time lower limit (inclusive: "from").
+     * Flights departing before this value are filtered out.
+     * If null, lower limit is not applied.
      */
     @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime departureDateFrom;
 
     /**
-     * Kalkış zamanı üst sınırı (inclusive: "to").
-     * Bu değerden sonra kalkan uçuşlar filtrelenir.
-     * null ise üst sınır uygulanmaz.
+     * Departure time upper limit (inclusive: "to").
+     * Flights departing after this value are filtered out.
+     * If null, upper limit is not applied.
      */
     @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime departureDateTo;
 
     /**
-     * Varış zamanı alt sınırı (inclusive: "from").
-     * Bu değerden önce gelen uçuşlar filtrelenir.
-     * null ise alt sınır uygulanmaz.
+     * Arrival time lower limit (inclusive: "from").
+     * Flights arriving before this value are filtered out.
+     * If null, lower limit is not applied.
      */
     @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime arrivalDateFrom;
 
     /**
-     * Varış zamanı üst sınırı (inclusive: "to").
-     * Bu değerden sonra gelen uçuşlar filtrelenir.
-     * null ise üst sınır uygulanmaz.
+     * Arrival time upper limit (inclusive: "to").
+     * Flights arriving after this value are filtered out.
+     * If null, upper limit is not applied.
      */
     @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime arrivalDateTo;
 
     /**
-     * Bu request'in herhangi bir aktif filtresi olup olmadığını döner.
-     * Cache key üretiminde ve log mesajlarında kullanışlıdır.
+     * Returns whether this request has any active filters.
+     * Useful for cache key generation and log messages.
      *
-     * Pure function: dış duruma bağımlı değil, aynı input → aynı output.
+     * Pure function: does not depend on external state, same input → same output.
      */
     public boolean hasActiveFilters() {
         return priceMin != null || priceMax != null

@@ -1,4 +1,4 @@
-    package com.technoly.infrastructure.client;
+package com.technoly.infrastructure.client;
 
 import com.flightprovider.wsdl.SearchRequest;
 import com.flightprovider.wsdl.SearchResult;
@@ -18,25 +18,25 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * SOAP provider client'ları için ortak davranışları tutan soyut sınıf.
+ * Abstract class holding common behaviors for SOAP provider clients.
  *
- * Bu sınıfın amacı:
- * - SOAP request oluşturma (domain request → provider request)
- * - SOAP çağrısını yapma (marshalSendAndReceive)
- * - Provider response'unu ortak modele map etme (SearchResult → FlightDto)
- * - Gözlemlenebilirlik (metrikler + loglar)
+ * The purpose of this class:
+ * - Creating SOAP request (domain request → provider request)
+ * - Making the SOAP call (marshalSendAndReceive)
+ * - Mapping provider response to the common model (SearchResult → FlightDto)
+ * - Observability (metrics + logs)
  *
- * Not:
- * - Resilience4j (retry/circuit breaker/bulkhead) kararları genellikle
- *   somut provider sınıflarında annotation ile tanımlanır.
- * - Bu sınıf, "tek bir yerden" hata/metric/log davranışını standardize eder.
+ * Note:
+ * - Resilience4j (retry/circuit breaker/bulkhead) decisions are usually
+ * defined via annotation in concrete provider classes.
+ * - This class standardizes error/metric/log behavior "from a single place".
  */
 @Slf4j
 abstract class AbstractClient {
 
-    // İstenen tarih formatına (Örn. "01-06-2026T15:00") göre tarih nesnelerini
-    // metne çevirmek (serialize) veya metinden nesneye dönüştürmek (deserialize)
-    // için kullandığımız Formatter nesnesi.
+    // Formatter object we use to convert date objects to text (serialize)
+    // or convert from text to object (deserialize) based on the desired date format
+    // (E.g. "01-06-2026T15:00").
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy'T'HH:mm");
 
     private final WebServiceTemplate webServiceTemplate;
@@ -50,18 +50,18 @@ abstract class AbstractClient {
     protected List<FlightDto> performSearch(FlightSearchRequest request, String providerName) {
         // Defensive Programming: Guard Clauses
         if (request == null) {
-            log.warn("[{}] Uçuş arama isteği null olamaz.", providerName);
+            log.warn("[{}] Flight search request cannot be null.", providerName);
             return Collections.emptyList();
         }
         if (request.getOrigin() == null || request.getDestination() == null) {
-            log.warn("[{}] Uçuş kalkış ve varış noktaları zorunludur.", providerName);
+            log.warn("[{}] Flight origin and destination are mandatory.", providerName);
             return Collections.emptyList();
         }
 
-        log.info("[{}] Uçuş araması (SOAP): {} → {} @ {}",
+        log.info("[{}] Flight search (SOAP): {} → {} @ {}",
                 providerName, request.getOrigin(), request.getDestination(), request.getDepartureDate());
 
-        // Metrik: provider'a yapılan toplam çağrı sayısı
+        // Metric: total number of calls made to the provider
         meterRegistry.counter("flight.search.provider.calls.total", "provider", providerName).increment();
 
         SearchRequest providerRequest = buildProviderRequest(request);
@@ -70,19 +70,19 @@ abstract class AbstractClient {
 
         try {
             result = (SearchResult) webServiceTemplate.marshalSendAndReceive(providerRequest);
-            // Metrik: başarılı provider çağrıları
+            // Metric: successful provider calls
             meterRegistry.counter("flight.search.provider.success", "provider", providerName).increment();
         } catch (Exception e) {
-            // Metrik: provider hata sayısı
+            // Metric: provider error count
             meterRegistry.counter("flight.search.provider.errors", "provider", providerName).increment();
-            log.error("[{}] SOAP iletişim hatası: {}", providerName, e.getMessage());
+            log.error("[{}] SOAP communication error: {}", providerName, e.getMessage());
 
-            // Exception'ı yukarı fırlatmak önemlidir:
-            // - Resilience4j annotation'ları bu exception'ı görüp
-            //   retry/circuit-breaker/fallback kararlarını uygulayabilir.
+            // Throwing the Exception upwards is important:
+            // - Resilience4j annotations can see this exception
+            // and apply retry/circuit-breaker/fallback decisions.
             throw e;
         } finally {
-            // Metrik: provider çağrısı süreleri (latency)
+            // Metric: provider call durations (latency)
             sample.stop(meterRegistry.timer("flight.search.provider.latency", "provider", providerName));
         }
 
@@ -91,7 +91,7 @@ abstract class AbstractClient {
 
     protected List<FlightDto> fallbackSearchFlights(FlightSearchRequest request, Throwable throwable,
             String providerName) {
-        log.warn("[{}] Fallback devrede. Origin: {}, Hata: {}", providerName,
+        log.warn("[{}] Fallback active. Origin: {}, Error: {}", providerName,
                 Optional.ofNullable(request).map(FlightSearchRequest::getOrigin).orElse("Unknown"),
                 throwable.getMessage());
         return Collections.emptyList();
@@ -102,7 +102,7 @@ abstract class AbstractClient {
         req.setOrigin(request.getOrigin());
         req.setDestination(request.getDestination());
 
-        // Functional approach: Optional ile if-not-null kontrolü
+        // Functional approach: if-not-null check with Optional
         Optional.ofNullable(request.getDepartureDate())
                 .ifPresent(date -> req.setDepartureDate(date.format(DATE_FORMATTER)));
 
@@ -113,7 +113,7 @@ abstract class AbstractClient {
         return Optional.ofNullable(result)
                 .filter(res -> {
                     if (res.isHasError()) {
-                        log.warn("[{}] Provider hata döndürdü: {}", providerName, res.getErrorMessage());
+                        log.warn("[{}] Provider returned error: {}", providerName, res.getErrorMessage());
                         return false;
                     }
                     return true;
@@ -121,7 +121,7 @@ abstract class AbstractClient {
                 .map(SearchResult::getFlights)
                 .orElseGet(Collections::emptyList)
                 .stream()
-                .filter(java.util.Objects::nonNull) // Defensive: Liste içindeki olası null elemanları eledik
+                .filter(java.util.Objects::nonNull) // Defensive: Eliminated possible null elements in the list
                 .map(flight -> FlightDto.builder()
                         .flightNumber(Optional.ofNullable(flight.getFlightNumber()).orElse("UNKNOWN"))
                         .origin(Optional.ofNullable(flight.getOrigin()).orElse("UNKNOWN"))
@@ -135,20 +135,20 @@ abstract class AbstractClient {
     }
 
     /**
-     * Uçak sağlayıcıdan (SOAP Servisinden) gelen String formatındaki tarih
-     * bilgisini,
-     * uygulamamızın içinde evrensel olarak kullanabilmek için Java'nın
-     * LocalDateTime nesnesine geri dönüştürür.
+     * Converts the date information in String format from the flight provider (SOAP
+     * Service)
+     * back to Java's LocalDateTime object so that it can be used universally
+     * within our application.
      */
     private LocalDateTime parseDateTime(String dateTimeStr) {
         if (dateTimeStr == null || dateTimeStr.isEmpty()) {
-            // Eğer dış sağlayıcı hatalı veya boş bir tarih dönerse, sistemin çökmesini
-            // engellemek için
-            // geçici veya yedek (fallback) bir değer olarak anlık tarihi döner.
+            // If the external provider returns an incorrect or empty date, to prevent
+            // the system from crashing, it returns the current date as a temporary
+            // or backup (fallback) value.
             return LocalDateTime.now(); // Fallback if provider returns bad date
         }
-        // Gelen String tarihi, belirlediğimiz "dd-MM-yyyy'T'HH:mm" format kuralına göre
-        // ayrıştırarak parse ederiz.
+        // We parse and split the incoming String date according to our
+        // specified "dd-MM-yyyy'T'HH:mm" format rule.
         return LocalDateTime.parse(dateTimeStr, DATE_FORMATTER);
     }
 }

@@ -26,16 +26,15 @@ import java.time.format.DateTimeFormatter;
 @EnableCaching
 public class RedisConfig {
 
-        private static final DateTimeFormatter CUSTOM_FORMATTER =
-                DateTimeFormatter.ofPattern("dd-MM-yyyy'T'HH:mm");
+        private static final DateTimeFormatter CUSTOM_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy'T'HH:mm");
 
         @Value("${cache.flight.ttl-minutes:5}")
         private long flightCacheTtlMinutes;
 
         /**
-         * Redis için JSON serializer.
-         * Spring Boot'un ObjectMapper'ını baz alır ve sadece
-         * LocalDateTime için custom format ekler.
+         * JSON serializer for Redis.
+         * It is based on Spring Boot's ObjectMapper and only adds
+         * a custom format for LocalDateTime.
          */
         @Bean
         public RedisSerializer<Object> redisValueSerializer(ObjectMapper baseMapper) {
@@ -45,14 +44,14 @@ public class RedisConfig {
                 SimpleModule module = new SimpleModule();
 
                 module.addSerializer(LocalDateTime.class,
-                        new LocalDateTimeSerializer(CUSTOM_FORMATTER));
+                                new LocalDateTimeSerializer(CUSTOM_FORMATTER));
 
                 module.addDeserializer(LocalDateTime.class,
-                        new LocalDateTimeDeserializer(CUSTOM_FORMATTER));
+                                new LocalDateTimeDeserializer(CUSTOM_FORMATTER));
 
                 mapper.registerModule(module);
 
-                // Timestamp yerine string kullan
+                // Use string instead of Timestamp
                 mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
                 return new GenericJackson2JsonRedisSerializer(mapper);
@@ -60,34 +59,31 @@ public class RedisConfig {
 
         @Bean
         public CacheManager cacheManager(
-                RedisConnectionFactory connectionFactory,
-                RedisSerializer<Object> redisValueSerializer) {
+                        RedisConnectionFactory connectionFactory,
+                        RedisSerializer<Object> redisValueSerializer) {
 
                 RedisCacheConfiguration config = RedisCacheConfiguration
-                        .defaultCacheConfig()
-                        .entryTtl(Duration.ofMinutes(10))
-                        .disableCachingNullValues()
-                        .serializeKeysWith(
-                                RedisSerializationContext.SerializationPair
-                                        .fromSerializer(new StringRedisSerializer())
-                        )
-                        .serializeValuesWith(
-                                RedisSerializationContext.SerializationPair
-                                        .fromSerializer(redisValueSerializer)
-                        );
+                                .defaultCacheConfig()
+                                .entryTtl(Duration.ofMinutes(10))
+                                .disableCachingNullValues()
+                                .serializeKeysWith(
+                                                RedisSerializationContext.SerializationPair
+                                                                .fromSerializer(new StringRedisSerializer()))
+                                .serializeValuesWith(
+                                                RedisSerializationContext.SerializationPair
+                                                                .fromSerializer(redisValueSerializer));
 
                 return RedisCacheManager.builder(connectionFactory)
-                        .cacheDefaults(config)
-                        .withCacheConfiguration("flightSearch",
-                                config.entryTtl(Duration.ofMinutes(flightCacheTtlMinutes)))
-                        .withCacheConfiguration("cheapestFlights",
-                                config.entryTtl(
-                                        Duration.ofMinutes(flightCacheTtlMinutes * 2))) // 2
-                        // katı
-                        // süreyle
-                        // tut
-                        .withCacheConfiguration("staticData", config.entryTtl(Duration.ofDays(1))) // 1
-                        // gün
-                        .build();
+                                .cacheDefaults(config)
+                                .withCacheConfiguration("flightSearch",
+                                                config.entryTtl(Duration.ofMinutes(flightCacheTtlMinutes)))
+                                .withCacheConfiguration("cheapestFlights",
+                                                config.entryTtl(
+                                                                Duration.ofMinutes(flightCacheTtlMinutes * 2))) // keep
+                                // for twice
+                                // the duration
+                                .withCacheConfiguration("staticData", config.entryTtl(Duration.ofDays(1))) // 1
+                                // day
+                                .build();
         }
 }

@@ -16,17 +16,20 @@ import java.util.List;
 /**
  * Provider A SOAP Client.
  *
- * Bu sınıf, {@link AbstractClient} içindeki ortak SOAP çağrı/mapping mantığını
- * kullanır ve provider bazlı dayanıklılık politikalarını Resilience4j ile uygular.
+ * This class uses the common SOAP call/mapping logic from
+ * {@link AbstractClient}
+ * and applies provider-based resilience policies using Resilience4j.
  *
- * Kullanılan Resilience4j annotation'ları:
- * - {@code @CircuitBreaker}: Sürekli hata durumunda devreyi açar, sistemi korur.
- * - {@code @Retry}: Geçici hatalarda tekrar deneme yapar.
- * - {@code @Bulkhead}: Aynı anda kaç çağrı yapılabileceğini sınırlar (kaynak koruması).
+ * Resilience4j annotations used:
+ * - {@code @CircuitBreaker}: Opens the circuit in case of continuous errors,
+ * protecting the system.
+ * - {@code @Retry}: Retries on transient errors.
+ * - {@code @Bulkhead}: Limits how many concurrent calls can be made (resource
+ * protection).
  *
  * Fallback:
- * - CircuitBreaker/Bulkhead fallback method'u, upstream hata durumunda boş liste
- *   dönerek "kısmi başarı" yaklaşımını destekler.
+ * - CircuitBreaker/Bulkhead fallback method supports a "partial success"
+ * approach by returning an empty list in case of upstream error.
  */
 @Component
 class FlightProviderAClient extends AbstractClient implements FlightProviderPort {

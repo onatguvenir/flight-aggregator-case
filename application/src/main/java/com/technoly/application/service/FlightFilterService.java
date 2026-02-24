@@ -11,45 +11,45 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
- * Uçuş Filtre Servisi
+ * Flight Filter Service
  *
- * FlightSearchRequest'teki opsiyonel filtre parametrelerini
+ * Applies the optional filter parameters from FlightSearchRequest
  * (priceMin, priceMax, departureDateFrom, departureDateTo,
- * arrivalDateFrom, arrivalDateTo) uçuş listesine uygular.
+ * arrivalDateFrom, arrivalDateTo) to the flight list.
  *
- * ---- Tasarım İlkeleri ----
+ * ---- Design Principles ----
  *
- * 1. Pure Function (Fonksiyonel Yaklaşım):
- * applyFilters() dış durumu değiştirmez, new list döner.
- * Input list'i mutate etmez. → Thread-safe, test edilmesi kolay.
+ * 1. Pure Function (Functional Approach):
+ * applyFilters() does not change external state, returns a new list.
+ * It does not mutate the input list. → Thread-safe, easy to test.
  *
  * 2. Composable Predicate Chain (Strategy Pattern):
- * Her filtre bağımsız bir Predicate<FlightDto>'dur.
- * Predicate.and() ile zincir kurulur; null predicate'ler atlanır.
- * Yeni filtre eklenmek istendiğinde sadece yeni Predicate eklenir (OCP).
+ * Each filter is an independent Predicate<FlightDto>.
+ * A chain is built with Predicate.and(); null predicates are skipped.
+ * When a new filter is needed, only a new Predicate is added (OCP).
  *
- * 3. Null = "Filtre yok" Semantiği:
- * Parametre null ise Predicate.alwaysTrue() döner (guard clause).
- * Bu sayede her parametre bağımsız olarak opt-in edilebilir.
+ * 3. Null = "No filter" Semantics:
+ * If the parameter is null, Predicate.alwaysTrue() is returned (guard clause).
+ * In this way, each parameter can be opted-in independently.
  *
- * 4. Defensive (Null-safe) Karşılaştırma:
- * FlightDto alanları null olabilir (sağlayıcıdan gelmemiş).
- * Null alan varsa o predicate false döner (uçuş filtrelenir).
+ * 4. Defensive (Null-safe) Comparison:
+ * FlightDto fields can be null (not provided by the provider).
+ * If there is a null field, that predicate returns false (flight is filtered).
  *
- * Örnek:
+ * Example:
  * applyFilters(flights, req.priceMin=200, req.priceMax=400)
- * → sadece 200 ≤ price ≤ 400 olan uçuşlar döner
+ * → only flights with 200 ≤ price ≤ 400 are returned
  */
 @Slf4j
 @Service
 class FlightFilterService {
 
     /**
-     * Tüm aktif filtreleri uçuş listesine uygular.
+     * Applies all active filters to the flight list.
      *
-     * @param flights Filtrelenecek uçuş listesi
-     * @param request Filtre parametrerini içeren arama isteği
-     * @return Filtrelenmiş yeni liste (orijinal liste değişmez)
+     * @param flights List of flights to be filtered
+     * @param request Search request containing filter parameters
+     * @return New filtered list (original list is unchanged)
      */
     List<FlightDto> applyFilters(List<FlightDto> flights, FlightSearchRequest request) {
         if (flights == null || flights.isEmpty()) {
@@ -57,12 +57,12 @@ class FlightFilterService {
         }
 
         if (!request.hasActiveFilters()) {
-            // Hiç filtre yoksa Stream overhead'inden kaçın
+            // Avoid Stream overhead if there are no filters at all
             return flights;
         }
 
-        // Composable Predicate zinciri oluştur
-        // Her predicate null-safe guard clause ile korunur
+        // Build Composable Predicate chain
+        // Each predicate is protected by a null-safe guard clause
         Predicate<FlightDto> combinedFilter = buildPricePredicate(request)
                 .and(buildDepartureDateFromPredicate(request))
                 .and(buildDepartureDateToPredicate(request))
@@ -73,7 +73,7 @@ class FlightFilterService {
                 .filter(combinedFilter)
                 .collect(Collectors.toList());
 
-        log.debug("Filtre uygulandı: {} → {} uçuş (filtreler: {})",
+        log.debug("Filter applied: {} → {} flights (filters: {})",
                 flights.size(), filtered.size(), describeFilters(request));
 
         return filtered;
@@ -82,14 +82,14 @@ class FlightFilterService {
     // ---- Private Predicate Builders ----
 
     /**
-     * Fiyat aralığı predicate'i (priceMin ve priceMax birlikte ele alınır).
-     * priceMin null → alt sınır yok; priceMax null → üst sınır yok.
-     * Flight.price null → uçuş filtrelenir (defensif).
+     * Price range predicate (priceMin and priceMax are handled together).
+     * priceMin null → no lower limit; priceMax null → no upper limit.
+     * Flight.price null → flight is filtered (defensive).
      */
     private Predicate<FlightDto> buildPricePredicate(FlightSearchRequest req) {
         return flight -> {
             if (flight.getPrice() == null) {
-                // Fiyatı bilinmeyen uçuş, fiyat filtresi varsa elenir.
+                // Flight with unknown price is eliminated if there is a price filter.
                 return req.getPriceMin() == null && req.getPriceMax() == null;
             }
             boolean minOk = req.getPriceMin() == null
@@ -101,7 +101,7 @@ class FlightFilterService {
     }
 
     /**
-     * Kalkış zamanı alt sınırı: departureDateTime >= departureDateFrom
+     * Departure time lower limit: departureDateTime >= departureDateFrom
      */
     private Predicate<FlightDto> buildDepartureDateFromPredicate(FlightSearchRequest req) {
         if (req.getDepartureDateFrom() == null)
@@ -111,7 +111,7 @@ class FlightFilterService {
     }
 
     /**
-     * Kalkış zamanı üst sınırı: departureDateTime <= departureDateTo
+     * Departure time upper limit: departureDateTime <= departureDateTo
      */
     private Predicate<FlightDto> buildDepartureDateToPredicate(FlightSearchRequest req) {
         if (req.getDepartureDateTo() == null)
@@ -121,7 +121,7 @@ class FlightFilterService {
     }
 
     /**
-     * Varış zamanı alt sınırı: arrivalDateTime >= arrivalDateFrom
+     * Arrival time lower limit: arrivalDateTime >= arrivalDateFrom
      */
     private Predicate<FlightDto> buildArrivalDateFromPredicate(FlightSearchRequest req) {
         if (req.getArrivalDateFrom() == null)
@@ -131,7 +131,7 @@ class FlightFilterService {
     }
 
     /**
-     * Varış zamanı üst sınırı: arrivalDateTime <= arrivalDateTo
+     * Arrival time upper limit: arrivalDateTime <= arrivalDateTo
      */
     private Predicate<FlightDto> buildArrivalDateToPredicate(FlightSearchRequest req) {
         if (req.getArrivalDateTo() == null)
@@ -140,7 +140,7 @@ class FlightFilterService {
                 && !flight.getArrivalDateTime().isAfter(req.getArrivalDateTo());
     }
 
-    /** Log açıklaması için aktif filtreleri özetle */
+    /** Summarize active filters for log description */
     private String describeFilters(FlightSearchRequest req) {
         StringBuilder sb = new StringBuilder();
         if (req.getPriceMin() != null)

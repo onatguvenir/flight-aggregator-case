@@ -13,15 +13,15 @@
     <name>Flight Aggregator - Application</name>
 
     <!--
-        APPLICATION MODÜLÜ
+        APPLICATION MODULE
         ====================
-        Use case'leri (iş mantığı orkestrasyonu) içerir:
-        - FlightAggregatorService: iki sağlayıcıdan paralel veri çeker
-        - CheapestFlightService: gruplama ve en ucuz seçim mantığı
-        - ApiLogService: log kayıtlarını yönetir
+        Contains use cases (business logic orchestration):
+        - FlightAggregatorService: fetches data from two providers in parallel
+        - CheapestFlightService: grouping and cheapest selection logic
+        - ApiLogService: manages log records
 
-        Infrastructure'a depend eder (port implementasyonlarına erişim için)
-        ama doğrudan framework detaylarından izole tutulur.
+        Depends on Infrastructure (for access to port implementations)
+        but is kept isolated from direct framework details.
     -->
     <dependencies>
         <dependency>

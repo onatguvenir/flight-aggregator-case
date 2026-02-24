@@ -21,15 +21,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 /**
- * FlightAggregatorService Unit Testi
+ * FlightAggregatorService Unit Test
  *
- * Test stratejisi:
- * - FlightSearchPort (Adapter) üzerinden gelen ham uçuşların çağrılması.
- * - FlightFilterService'nin uygulanması mantığı doğrulanır.
+ * Test strategy:
+ * - Calling raw flights via FlightSearchPort (Adapter).
+ * - Verifying the logic of applying FlightFilterService.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@DisplayName("FlightAggregatorService Unit Testleri")
+@DisplayName("FlightAggregatorService Unit Tests")
 class FlightAggregatorServiceTest {
 
     @Mock
@@ -54,7 +54,7 @@ class FlightAggregatorServiceTest {
     }
 
     @Test
-    @DisplayName("FlightSearchPort çağrılır ve filtreler uygulanır")
+    @DisplayName("FlightSearchPort is called and filters are applied")
     void shouldCallPortAndApplyFilters() {
         // GIVEN
         List<FlightDto> rawFlights = createFlights(5, "ANY");
@@ -73,7 +73,7 @@ class FlightAggregatorServiceTest {
     }
 
     @Test
-    @DisplayName("Hiç uçuş dönmediğinde boş liste döner")
+    @DisplayName("Returns empty list when no flights are returned")
     void shouldReturnEmptyListWhenPortReturnsEmpty() {
         List<FlightDto> emptyRawFlights = new ArrayList<>();
         when(flightSearchPort.searchAllFlights(testRequest)).thenReturn(emptyRawFlights);

@@ -9,24 +9,25 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * PII (Personally Identifiable Information) Maskeleme Annotasyonu
+ * PII (Personally Identifiable Information) Masking Annotation
  *
- * Bu annotasyon ile işaretlenen alanlar, JSON serializasyonu sırasında
- * otomatik olarak maskelenir: "John Doe" → "Jo***oe"
+ * Fields annotated with this are automatically masked during JSON
+ * serialization:
+ * "John Doe" → "Jo***oe"
  *
- * Infrastructure modülünde yer alır çünkü jackson-databind
- * (MaskingSerializer için gerekli) domain modülünde Lombok AP çakışmasına yol
- * açar.
+ * Located in the Infrastructure module because jackson-databind
+ * (required for MaskingSerializer) causes a Lombok AP conflict in the domain
+ * module.
  *
- * Kapsam: Sadece kişisel veriler (KVKK / GDPR uyumluluğu için):
- * - passengerName : Yolcu adı soyadı
- * - email : E-posta adresi
- * - phone : Telefon numarası
- * - passportNo : Pasaport numarası
+ * Scope: Only personal data (for KVKK / GDPR compliance):
+ * - passengerName : Passenger full name
+ * - email : E-mail address
+ * - phone : Phone number
+ * - passportNo : Passport number
  *
- * @JacksonAnnotationsInside: Kompozit annotation örüntüsü.
- *                            Bu annotasyonu kullanan alanlara
- *                            Jackson @JsonSerialize'i otomatik uygular.
+ * @JacksonAnnotationsInside: Composite annotation pattern.
+ *                            Automatically applies Jackson's @JsonSerialize
+ *                            to fields that use this annotation.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)

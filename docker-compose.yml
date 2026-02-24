@@ -4,19 +4,19 @@ version: '3.9'
 # Flight Aggregator - Docker Compose
 # =====================================================================
 #
-# Çalıştırma:
+# Execution:
 #   Local : docker-compose --env-file .env up -d
 #   QA    : docker-compose --env-file .env.qa up -d
 #   Prod  : docker-compose --env-file .env.prod up -d
 #
-# Ortam değişkenleri .env, .env.qa, .env.prod dosyalarından gelir.
-# docker-compose'a hard-coded değer YOKTUR — 12-factor app prensibi.
+# Environment variables come from .env, .env.qa, .env.prod files.
+# There are NO hard-coded values in docker-compose — 12-factor app principle.
 #
-# Servisler:
+# Services:
 #   - postgres          : PostgreSQL 16
 #   - redis             : Redis 7
 #   - flight-aggregator : REST API (:8080)
-#   - prometheus        : Metrik toplama (:9090)
+#   - prometheus        : Metrics collection (:9090)
 #   - grafana           : Dashboard UI (:3000)
 #   - elasticsearch     : Log storage (:9200)
 #   - logstash          : Log aggregator (:5044)
@@ -58,7 +58,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    # AOF persistence — container restart sonrasında cache korunur
+    # AOF persistence — cache is preserved after container restart
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -144,7 +144,7 @@ services:
     ports:
       - "8080:8080"
       - "5005:5005"
-    # Tüm değerler .env.{local|qa|prod} dosyasından gelir
+    # All values come from .env.{local|qa|prod} file
     environment:
       # debugging disabled in compose; avoid JVM suspension
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
@@ -159,10 +159,10 @@ services:
       CACHE_TTL_MINUTES: ${CACHE_TTL_MINUTES:-5}
       LOG_LEVEL_APP: ${LOG_LEVEL_APP:-INFO}
       LOG_LEVEL_SPRING: ${LOG_LEVEL_SPRING:-WARN}
-      # ELK: Logstash hedef adresi
+      # ELK: Logstash target address
       LOGSTASH_HOST: logstash
       LOGSTASH_PORT: 5044
-      # Security: false → JWT devre dışı (local dev için), true → JWT zorunlu
+      # Security: false → JWT disabled (for local dev), true → JWT required
       SECURITY_ENABLED: ${SECURITY_ENABLED:-false}
       # Rate Limiting
       RATE_LIMIT_CAPACITY: ${RATE_LIMIT_CAPACITY:-60}
@@ -191,7 +191,7 @@ services:
     restart: unless-stopped
 
   # ========================
-  # Prometheus — Metrik toplama
+  # Prometheus — Metrics collection
   # ========================
   prometheus:
     image: prom/prometheus:v2.50.1
@@ -199,15 +199,15 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      # prometheus.yml: scrape config (hangi servisleri izle)
+      # prometheus.yml: scrape config (which services to monitor)
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      # 15 günlük veri saklama (production'da artır veya remote storage kullan)
+      # 15 days data retention (increase in production or use remote storage)
       - '--storage.tsdb.retention.time=15d'
-      - '--web.enable-lifecycle'     # API ile config reload: POST /-/reload
+      - '--web.enable-lifecycle'     # Config reload via API: POST /-/reload
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
       interval: 15s
@@ -228,20 +228,20 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Admin kullanıcı — .env dosyasından gelir
+      # Admin user — comes from .env file
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
-      # Anonim erişim yok (güvenlik)
+      # No anonymous access (security)
       GF_AUTH_ANONYMOUS_ENABLED: "false"
-      # Kullanıcı kayıt formu kapalı
+      # User registration form disabled
       GF_USERS_ALLOW_SIGN_UP: "false"
-      # Saat dilimi
+      # Timezone
       GF_DEFAULT_TIMEZONE: browser
     volumes:
-      # Provisioning: datasource + dashboard otomatik yüklenir
+      # Provisioning: datasource + dashboard automatically loaded
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      # Persistent storage: dashboard düzenlemeleri kaybolmaz
+      # Persistent storage: dashboard edits are not lost
       - grafana_data:/var/lib/grafana
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
@@ -261,9 +261,9 @@ services:
     image: elasticsearch:8.12.1
     container_name: flight_elasticsearch
     environment:
-      # Single-node development modu — üretimde cluster kurulur
+      # Single-node development mode — a cluster is set up in production
       discovery.type: single-node
-      # X-Pack security'yi dev için devre dışı bırak
+      # Disable X-Pack security for dev
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
     ports:
@@ -289,7 +289,7 @@ services:
       - "5044:5044"   # TCP input from Spring Boot
       - "9600:9600"   # Logstash API (monitoring)
     volumes:
-      # Pipeline konfigürasyonu: logstash/pipeline/logstash.conf
+      # Pipeline configuration: logstash/pipeline/logstash.conf
       - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
     environment:
       LS_JAVA_OPTS: "-Xms256m -Xmx256m"

@@ -16,11 +16,11 @@ import java.util.List;
 /**
  * Provider B SOAP Client.
  *
- * Provider A ile aynı mimari yaklaşımı izler:
- * - Ortak SOAP çağrı/mapping mantığı {@link AbstractClient} içinde.
- * - Dayanıklılık (retry/circuit breaker/bulkhead) Resilience4j annotation'ları ile.
+ * Follows the same architectural approach as Provider A:
+ * - Common SOAP call/mapping logic in {@link AbstractClient}.
+ * - Resilience (retry/circuit breaker/bulkhead) via Resilience4j annotations.
  *
- * Not: Provider isimleri metrik label'larında ve loglarda ayrıştırma için önemlidir.
+ * Note: Provider names are important for separation in metric labels and logs.
  */
 @Component
 class FlightProviderBClient extends AbstractClient implements FlightProviderPort {
