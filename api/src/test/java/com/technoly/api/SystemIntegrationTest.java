@@ -35,235 +35,212 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Sistem Entegrasyon Testi — In-Memory H2 Veritabanı İle
+ * System Integration Test — With In-Memory H2 DB
  *
- * NOT: Bu test, testcontainers kaldırıldığı için dış bir Docker bağımlılığı
- * olmadan doğrudan In-Memory H2 veritabanı (flightdb) üzerinde çalışır.
- *
- * SOAP ve Redis entegrasyonları için Mock / In-Memory çözümleri
- * kullanılarak izole edilmiştir.
+ * NOTE: Runs directly on H2 (flightdb) without external Docker dependencies.
+ * SOAP and Redis integrations are isolated via Mock / In-Memory solutions.
  */
-
 @SpringBootTest(classes = FlightAggregatorApplication.class, properties = {
-        "security.enabled=false",
-        "spring.datasource.url=jdbc:h2:mem:flightdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-        "spring.flyway.enabled=false",
-        // disable automatic schema creation because H2 doesn't understand jsonb
-        "spring.jpa.hibernate.ddl-auto=none",
-        "spring.data.redis.host=localhost",
-        "spring.data.redis.port=6379"
+                "security.enabled=false",
+                "spring.datasource.url=jdbc:h2:mem:flightdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+                "spring.datasource.username=sa",
+                "spring.datasource.password=",
+                "spring.datasource.driver-class-name=org.h2.Driver",
+                "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
+                "spring.flyway.enabled=false",
+                "spring.jpa.hibernate.ddl-auto=none",
+                "spring.data.redis.host=localhost",
+                "spring.data.redis.port=6379"
 })
 @Import(com.technoly.infrastructure.config.JpaConfig.class)
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @WithMockUser
-@DisplayName("Çalışan Altyapı İle (Live Localhost) Entegrasyon Testi")
+@DisplayName("Live Localhost Integration Test")
 class SystemIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    // datasource used to bootstrap an H2-friendly table before the context is used
-    @Autowired
-    private DataSource dataSource;
+        @Autowired
+        private DataSource dataSource;
 
-    @MockBean(name = "webServiceTemplateA")
-    private WebServiceTemplate webServiceTemplateA;
+        @MockBean(name = "webServiceTemplateA")
+        private WebServiceTemplate webServiceTemplateA;
 
-    @MockBean(name = "webServiceTemplateB")
-    private WebServiceTemplate webServiceTemplateB;
+        @MockBean(name = "webServiceTemplateB")
+        private WebServiceTemplate webServiceTemplateB;
 
-    @MockBean
-    private RedisConnectionFactory redisConnectionFactory;
+        @MockBean
+        private RedisConnectionFactory redisConnectionFactory;
 
-    @MockBean
-    private ReactiveRedisConnectionFactory reactiveRedisConnectionFactory;
+        @MockBean
+        private ReactiveRedisConnectionFactory reactiveRedisConnectionFactory;
 
-    private static final String ORIGIN = "IST";
-    private static final String DESTINATION = "LHR";
-    private static final String DEPARTURE_DATE = "01-06-2026T10:00";
+        private static final String ORIGIN = "IST";
+        private static final String DESTINATION = "LHR";
+        private static final String DEPARTURE_DATE = "01-06-2026T10:00";
 
-    // create H2-compatible api_logs table before any test methods run
-    @BeforeAll
-    static void initSchema(@Autowired DataSource dataSource) throws SQLException {
-        try (Connection conn = dataSource.getConnection();
-             Statement stmt = conn.createStatement()) {
-            // simple table definition using text/clob so H2 doesn't complain about jsonb
-            stmt.executeUpdate("""
-                    CREATE TABLE IF NOT EXISTS api_logs (
-                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-                        endpoint VARCHAR(255) NOT NULL,
-                        request CLOB NOT NULL,
-                        response CLOB,
-                        status_code INTEGER,
-                        duration_ms BIGINT,
-                        created_at TIMESTAMP NOT NULL
-                    )
-                    """);
+        @BeforeAll
+        static void initSchema(@Autowired DataSource dataSource) throws SQLException {
+                try (Connection conn = dataSource.getConnection();
+                                Statement stmt = conn.createStatement()) {
+                        stmt.executeUpdate("""
+                                        CREATE TABLE IF NOT EXISTS api_logs (
+                                            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                                            endpoint VARCHAR(255) NOT NULL,
+                                            request CLOB NOT NULL,
+                                            response CLOB,
+                                            status_code INTEGER,
+                                            duration_ms BIGINT,
+                                            created_at TIMESTAMP NOT NULL
+                                        )
+                                        """);
+                }
         }
-    }
 
-    @BeforeEach
-    void verifyAndLog() {
-        // message updated to reflect test setup: H2 in‑memory DB and mocked Redis
-        System.out.println(">>> In-memory H2 database & mocked Redis are in use (no Docker containers)");
+        @BeforeEach
+        void verifyAndLog() {
+                System.out.println(">>> In-memory H2 database & mocked Redis are in use (no Docker containers)");
 
-        // Mock Provider A
-        SearchResult resultA = new SearchResult();
-        resultA.setHasError(false);
-        Flight flightA = new Flight();
-        flightA.setFlightNumber("A123");
-        flightA.setOrigin("IST");
-        flightA.setDestination("LHR");
-        flightA.setDepartureTime("01-06-2026T10:00");
-        flightA.setArrivalTime("01-06-2026T14:00");
-        flightA.setPrice(new BigDecimal("150.00"));
-        resultA.getFlights().add(flightA);
-        Mockito.lenient()
-                .when(webServiceTemplateA.marshalSendAndReceive(ArgumentMatchers.any()))
-                .thenReturn(resultA);
+                SearchResult resultA = new SearchResult();
+                resultA.setHasError(false);
+                Flight flightA = new Flight();
+                flightA.setFlightNumber("A123");
+                flightA.setOrigin("IST");
+                flightA.setDestination("LHR");
+                flightA.setDepartureTime("01-06-2026T10:00");
+                flightA.setArrivalTime("01-06-2026T14:00");
+                flightA.setPrice(new BigDecimal("150.00"));
+                resultA.getFlights().add(flightA);
+                Mockito.lenient()
+                                .when(webServiceTemplateA.marshalSendAndReceive(ArgumentMatchers.any()))
+                                .thenReturn(resultA);
 
-        // Mock Provider B
-        SearchResult resultB = new SearchResult();
-        resultB.setHasError(false);
-        Flight flightB = new Flight();
-        flightB.setFlightNumber("B456");
-        flightB.setOrigin("IST");
-        flightB.setDestination("LHR");
-        flightB.setDepartureTime("01-06-2026T10:00");
-        flightB.setArrivalTime("01-06-2026T14:00");
-        flightB.setPrice(new BigDecimal("120.00"));
-        resultB.getFlights().add(flightB);
-        Mockito.lenient()
-                .when(webServiceTemplateB.marshalSendAndReceive(ArgumentMatchers.any()))
-                .thenReturn(resultB);
-    }
-
-    // =====================================================================
-    // TEST METODLARI
-    // =====================================================================
-
-    @Test
-    @DisplayName("1. Tüm uçuşlar endpoint'i — ProviderA ve ProviderB verisi döner")
-    void searchAllFlights_returnsBothProviders() throws Exception {
-        System.out.println(">>> 1. ENDPOINT: GET /api/v1/flights/search");
-
-        MvcResult result = mockMvc.perform(get("/api/v1/flights/search")
-                .param("origin", ORIGIN)
-                .param("destination", DESTINATION)
-                .param("departureDate", DEPARTURE_DATE))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andReturn();
-
-        FlightSearchResponse response = objectMapper.readValue(
-                result.getResponse().getContentAsString(), FlightSearchResponse.class);
-
-        // Provider'ların her ikisi de veri döndürmeli
-        boolean hasProviderA = response.getFlights().stream()
-                .anyMatch(f -> f.getProvider() != null && f.getProvider().toUpperCase().contains("A"));
-        boolean hasProviderB = response.getFlights().stream()
-                .anyMatch(f -> f.getProvider() != null && f.getProvider().toUpperCase().contains("B"));
-
-        System.out.printf(">>> Toplam uçuş: %d | ProviderA: %b | ProviderB: %b%n",
-                response.getTotalCount(), hasProviderA, hasProviderB);
-
-        assertThat(response.getFlights()).isNotEmpty();
-        assertThat(response.getTotalCount()).isPositive();
-        assertThat(hasProviderA).as("ProviderA uçuş döndürmeli").isTrue();
-        assertThat(hasProviderB).as("ProviderB uçuş döndürmeli").isTrue();
-    }
-
-    @Test
-    @DisplayName("2. En ucuz uçuşlar endpoint'i — sıralı ve gruplu sonuç döner")
-    void searchCheapestFlights_returnsSortedResults() throws Exception {
-        System.out.println(">>> 2. ENDPOINT: GET /api/v1/flights/search/cheapest");
-
-        MvcResult result = mockMvc.perform(get("/api/v1/flights/search/cheapest")
-                .param("origin", ORIGIN)
-                .param("destination", DESTINATION)
-                .param("departureDate", DEPARTURE_DATE))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andReturn();
-
-        FlightSearchResponse response = objectMapper.readValue(
-                result.getResponse().getContentAsString(), FlightSearchResponse.class);
-
-        System.out.printf(">>> En ucuz uçuş sayısı: %d%n", response.getTotalCount());
-
-        // En ucuz sonuçlar fiyata göre sıralı olmalı
-        if (response.getFlights().size() > 1) {
-            for (int i = 0; i < response.getFlights().size() - 1; i++) {
-                var current = response.getFlights().get(i).getPrice();
-                var next = response.getFlights().get(i + 1).getPrice();
-                assertThat(current).as("Fiyatlar artan sırada olmalı").isLessThanOrEqualTo(next);
-            }
+                SearchResult resultB = new SearchResult();
+                resultB.setHasError(false);
+                Flight flightB = new Flight();
+                flightB.setFlightNumber("B456");
+                flightB.setOrigin("IST");
+                flightB.setDestination("LHR");
+                flightB.setDepartureTime("01-06-2026T10:00");
+                flightB.setArrivalTime("01-06-2026T14:00");
+                flightB.setPrice(new BigDecimal("120.00"));
+                resultB.getFlights().add(flightB);
+                Mockito.lenient()
+                                .when(webServiceTemplateB.marshalSendAndReceive(ArgumentMatchers.any()))
+                                .thenReturn(resultB);
         }
-    }
 
-    @Test
-    @DisplayName("3. API log endpoint'i — istekler DB'ye loglanır ve sayfalı döner")
-    void getLogs_returnsPagedApiLogs() throws Exception {
-        System.out.println(">>> 3. ENDPOINT: GET /api/v1/logs");
+        @Test
+        @DisplayName("1. Search all flights — Returns data from both providers")
+        void searchAllFlights_returnsBothProviders() throws Exception {
+                System.out.println(">>> 1. ENDPOINT: GET /api/v1/flights/search");
 
-        // Önce birkaç istek at ki log oluşsun
-        mockMvc.perform(get("/api/v1/flights/search")
-                .param("origin", ORIGIN)
-                .param("destination", DESTINATION)
-                .param("departureDate", DEPARTURE_DATE))
-                .andExpect(status().isOk());
+                MvcResult result = mockMvc.perform(get("/api/v1/flights/search")
+                                .param("origin", ORIGIN)
+                                .param("destination", DESTINATION)
+                                .param("departureDate", DEPARTURE_DATE))
+                                .andDo(print())
+                                .andExpect(status().isOk())
+                                .andReturn();
 
-        // Log endpoint'ini sorgula
-        String logResponse = mockMvc.perform(get("/api/v1/logs"))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+                FlightSearchResponse response = objectMapper.readValue(
+                                result.getResponse().getContentAsString(), FlightSearchResponse.class);
 
-        System.out.printf(">>> Log response uzunluğu: %d karakter%n", logResponse.length());
+                boolean hasProviderA = response.getFlights().stream()
+                                .anyMatch(f -> f.getProvider() != null && f.getProvider().toUpperCase().contains("A"));
+                boolean hasProviderB = response.getFlights().stream()
+                                .anyMatch(f -> f.getProvider() != null && f.getProvider().toUpperCase().contains("B"));
 
-        // Response boş olmamalı ve Page yapısında olmalı
-        assertThat(logResponse).contains("content");
-        assertThat(logResponse).contains("totalElements");
-    }
+                System.out.printf(">>> Total flights: %d | ProviderA: %b | ProviderB: %b%n",
+                                response.getTotalCount(), hasProviderA, hasProviderB);
 
-    @Test
-    @DisplayName("4. Cache testi — 2. çağrı Redis cache'ten gelir")
-    void searchFlights_secondCallHitCache() throws Exception {
-        // İlk çağrı: DB + Provider
-        long start1 = System.currentTimeMillis();
-        mockMvc.perform(get("/api/v1/flights/search")
-                .param("origin", ORIGIN)
-                .param("destination", DESTINATION)
-                .param("departureDate", DEPARTURE_DATE))
-                .andExpect(status().isOk());
-        long duration1 = System.currentTimeMillis() - start1;
+                assertThat(response.getFlights()).isNotEmpty();
+                assertThat(response.getTotalCount()).isPositive();
+                assertThat(hasProviderA).as("Should return ProviderA flights").isTrue();
+                assertThat(hasProviderB).as("Should return ProviderB flights").isTrue();
+        }
 
-        // İkinci çağrı: Cache hit (çok daha hızlı olmalı)
-        long start2 = System.currentTimeMillis();
-        MvcResult cached = mockMvc.perform(get("/api/v1/flights/search")
-                .param("origin", ORIGIN)
-                .param("destination", DESTINATION)
-                .param("departureDate", DEPARTURE_DATE))
-                .andExpect(status().isOk())
-                .andReturn();
-        long duration2 = System.currentTimeMillis() - start2;
+        @Test
+        @DisplayName("2. Search cheapest flights — Returns sorted and grouped results")
+        void searchCheapestFlights_returnsSortedResults() throws Exception {
+                System.out.println(">>> 2. ENDPOINT: GET /api/v1/flights/search/cheapest");
 
-        FlightSearchResponse response = objectMapper.readValue(
-                cached.getResponse().getContentAsString(), FlightSearchResponse.class);
+                MvcResult result = mockMvc.perform(get("/api/v1/flights/search/cheapest")
+                                .param("origin", ORIGIN)
+                                .param("destination", DESTINATION)
+                                .param("departureDate", DEPARTURE_DATE))
+                                .andDo(print())
+                                .andExpect(status().isOk())
+                                .andReturn();
 
-        System.out.printf(">>> 1. çağrı: %dms | 2. çağrı (cache): %dms%n", duration1, duration2);
+                FlightSearchResponse response = objectMapper.readValue(
+                                result.getResponse().getContentAsString(), FlightSearchResponse.class);
 
-        // Cache yanıtı da geçerli veri içermeli
-        assertThat(response.getFlights()).isNotEmpty();
-    }
+                System.out.printf(">>> Cheapest flights count: %d%n", response.getTotalCount());
+
+                if (response.getFlights().size() > 1) {
+                        for (int i = 0; i < response.getFlights().size() - 1; i++) {
+                                var current = response.getFlights().get(i).getPrice();
+                                var next = response.getFlights().get(i + 1).getPrice();
+                                assertThat(current).as("Prices must be in ascending order").isLessThanOrEqualTo(next);
+                        }
+                }
+        }
+
+        @Test
+        @DisplayName("3. API log endpoint — Requests logged to DB and returned paged")
+        void getLogs_returnsPagedApiLogs() throws Exception {
+                System.out.println(">>> 3. ENDPOINT: GET /api/v1/logs");
+
+                mockMvc.perform(get("/api/v1/flights/search")
+                                .param("origin", ORIGIN)
+                                .param("destination", DESTINATION)
+                                .param("departureDate", DEPARTURE_DATE))
+                                .andExpect(status().isOk());
+
+                String logResponse = mockMvc.perform(get("/api/v1/logs"))
+                                .andDo(print())
+                                .andExpect(status().isOk())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString();
+
+                System.out.printf(">>> Log response length: %d characters%n", logResponse.length());
+
+                assertThat(logResponse).contains("content");
+                assertThat(logResponse).contains("totalElements");
+        }
+
+        @Test
+        @DisplayName("4. Cache test — 2nd call hits Redis cache")
+        void searchFlights_secondCallHitCache() throws Exception {
+                long start1 = System.currentTimeMillis();
+                mockMvc.perform(get("/api/v1/flights/search")
+                                .param("origin", ORIGIN)
+                                .param("destination", DESTINATION)
+                                .param("departureDate", DEPARTURE_DATE))
+                                .andExpect(status().isOk());
+                long duration1 = System.currentTimeMillis() - start1;
+
+                long start2 = System.currentTimeMillis();
+                MvcResult cached = mockMvc.perform(get("/api/v1/flights/search")
+                                .param("origin", ORIGIN)
+                                .param("destination", DESTINATION)
+                                .param("departureDate", DEPARTURE_DATE))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                long duration2 = System.currentTimeMillis() - start2;
+
+                FlightSearchResponse response = objectMapper.readValue(
+                                cached.getResponse().getContentAsString(), FlightSearchResponse.class);
+
+                System.out.printf(">>> 1st call: %dms | 2nd call (cache): %dms%n", duration1, duration2);
+
+                assertThat(response.getFlights()).isNotEmpty();
+        }
 }

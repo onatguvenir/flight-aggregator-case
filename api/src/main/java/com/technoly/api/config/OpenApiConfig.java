@@ -15,39 +15,30 @@ import org.springframework.context.annotation.Configuration;
 import java.util.List;
 
 /**
- * OpenAPI 3 (Swagger) Konfigürasyonu
- *
- * SpringDoc OpenAPI, controller method'larındaki annotation'ları okuyarak
- * otomatik API dökümantasyonu oluşturur.
- * Bu bean, API genel bilgilerini (başlık, versiyon, iletişim) configure eder.
- *
- * Swagger UI erişim adresi: http://localhost:8080/swagger-ui.html
- * OpenAPI JSON: http://localhost:8080/api-docs
+ * OpenAPI 3 (Swagger) Configuration
  */
 @Configuration
 public class OpenApiConfig {
 
+        private static final String BEARER_AUTH = "BearerAuth";
+
         @Value("${server.port:8080}")
         private String serverPort;
 
-        /**
-         * OpenAPI bean'i: Swagger UI'ın başlık sekmeyi ve genel bilgileri
-         * bu bean'den alır.
-         */
         @Bean
         public OpenAPI flightAggregatorOpenApi() {
                 return new OpenAPI()
                                 .info(new Info()
                                                 .title("Flight Aggregator API")
                                                 .description("""
-                                                                Flight Aggregator, FlightProvider A ve FlightProvider B sağlayıcılarından
-                                                                uçuş bilgilerini paralel olarak toplar ve iki farklı REST servisi sunar:
+                                                                Flight Aggregator collects flight data from FlightProvider A and FlightProvider B
+                                                                in parallel and provides two REST services:
 
-                                                                - **Service 1** (`/api/v1/flights/search`): Her iki sağlayıcıdan tüm uçuşlar
-                                                                - **Service 2** (`/api/v1/flights/search/cheapest`): Gruplanmış en ucuz uçuşlar
+                                                                - **Service 1** (`/api/v1/flights/search`): All flights from both providers
+                                                                - **Service 2** (`/api/v1/flights/search/cheapest`): Cheapest flights per group
 
-                                                                Her istek ve yanıt PostgreSQL'e asenkron olarak loglanır.
-                                                                Redis ile cache, Resilience4j ile Circuit Breaker koruması mevcuttur.
+                                                                Requests and responses are asynchronously logged to PostgreSQL.
+                                                                Includes Redis caching and Resilience4j Circuit Breaker protection.
                                                                 """)
                                                 .version("1.0.0")
                                                 .contact(new Contact()
@@ -59,12 +50,12 @@ public class OpenApiConfig {
                                 .servers(List.of(
                                                 new Server()
                                                                 .url("http://localhost:" + serverPort)
-                                                                .description("Geliştirme Sunucusu")))
-                                .addSecurityItem(new SecurityRequirement().addList("BearerAuth"))
+                                                                .description("Development Server")))
+                                .addSecurityItem(new SecurityRequirement().addList(BEARER_AUTH))
                                 .components(new Components()
-                                                .addSecuritySchemes("BearerAuth",
+                                                .addSecuritySchemes(BEARER_AUTH,
                                                                 new SecurityScheme()
-                                                                                .name("BearerAuth")
+                                                                                .name(BEARER_AUTH)
                                                                                 .type(SecurityScheme.Type.HTTP)
                                                                                 .scheme("bearer")
                                                                                 .bearerFormat("JWT")));

@@ -23,20 +23,7 @@ import java.util.Base64;
 import java.util.Map;
 
 /**
- * Basit OAuth2 Client Credentials akışı için Access Token endpoint'i.
- *
- * Amaç: Postman veya başka bir client'in "/oauth/token" isteği ile
- * HS256 imzalı JWT üretip alabilmesi.
- *
- * Desteklenen akış:
- * - grant_type=client_credentials
- * - İstemci kimlik doğrulaması:
- *    - Authorization: Basic base64(clientId:clientSecret)
- *      veya
- *    - form parametreleri: client_id, client_secret
- *
- * Bu controller tam bir OAuth2 Authorization Server değildir;
- * demo ve internal kullanım için hafif bir token üreticisidir.
+ * Access Token endpoint for a simple OAuth2 Client Credentials flow.
  */
 @Slf4j
 @RestController
@@ -59,18 +46,15 @@ public class OAuthTokenController {
             @RequestParam(value = "grant_type", defaultValue = "client_credentials") String grantType,
             @RequestParam(value = "client_id", required = false) String formClientId,
             @RequestParam(value = "client_secret", required = false) String formClientSecret,
-            @RequestHeader(value = "Authorization", required = false) String authorizationHeader
-    ) {
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
 
         if (!"client_credentials".equals(grantType)) {
             return ResponseEntity.badRequest()
                     .body(Map.of(
                             "error", "unsupported_grant_type",
-                            "error_description", "Sadece client_credentials grant_type destekleniyor."
-                    ));
+                            "error_description", "Only client_credentials grant_type is supported."));
         }
 
-        // 1) Authorization: Basic ... başlığından kimlik çöz
         String[] clientCredsFromHeader = extractClientFromBasicAuth(authorizationHeader);
         String providedClientId = clientCredsFromHeader[0] != null ? clientCredsFromHeader[0] : formClientId;
         String providedClientSecret = clientCredsFromHeader[1] != null ? clientCredsFromHeader[1] : formClientSecret;
@@ -79,17 +63,15 @@ public class OAuthTokenController {
             return ResponseEntity.status(401)
                     .body(Map.of(
                             "error", "invalid_client",
-                            "error_description", "client_id / client_secret eksik."
-                    ));
+                            "error_description", "client_id / client_secret is missing."));
         }
 
         if (!clientId.equals(providedClientId) || !clientSecret.equals(providedClientSecret)) {
-            log.warn("Geçersiz client kimlik bilgisi: {}", providedClientId);
+            log.warn("Invalid client credentials: {}", providedClientId);
             return ResponseEntity.status(401)
                     .body(Map.of(
                             "error", "invalid_client",
-                            "error_description", "client_id veya client_secret hatalı."
-                    ));
+                            "error_description", "client_id or client_secret is incorrect."));
         }
 
         Instant now = Instant.now();
@@ -103,24 +85,20 @@ public class OAuthTokenController {
                 .claim("scope", "flights.read")
                 .build();
 
-        // Önemli: Encoder tarafında algoritmayı HS256 olarak sabitlemezsek,
-        // bazı ortamlarda default header farklı seçilip (örn. RS256) HMAC key ile
-        // token üretiminde 500'e düşebilir.
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).type("JWT").build();
         String tokenValue = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
 
         Map<String, Object> responseBody = Map.of(
                 "access_token", tokenValue,
                 "token_type", "Bearer",
-                "expires_in", tokenValiditySeconds
-        );
+                "expires_in", tokenValiditySeconds);
 
         return ResponseEntity.ok(responseBody);
     }
 
     private String[] extractClientFromBasicAuth(String authorizationHeader) {
         if (authorizationHeader == null || !authorizationHeader.startsWith("Basic ")) {
-            return new String[]{null, null};
+            return new String[] { null, null };
         }
         try {
             String base64Credentials = authorizationHeader.substring("Basic ".length());
@@ -128,15 +106,14 @@ public class OAuthTokenController {
             String credentials = new String(decoded, StandardCharsets.UTF_8);
             int separatorIndex = credentials.indexOf(':');
             if (separatorIndex == -1) {
-                return new String[]{null, null};
+                return new String[] { null, null };
             }
             String id = credentials.substring(0, separatorIndex);
             String secret = credentials.substring(separatorIndex + 1);
-            return new String[]{id, secret};
+            return new String[] { id, secret };
         } catch (IllegalArgumentException e) {
-            log.warn("Basic Authorization header çözümlenemedi: {}", e.getMessage());
-            return new String[]{null, null};
+            log.warn("Failed to decode Basic Authorization header: {}", e.getMessage());
+            return new String[] { null, null };
         }
     }
 }
-

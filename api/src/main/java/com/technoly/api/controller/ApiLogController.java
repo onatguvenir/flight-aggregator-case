@@ -25,83 +25,50 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
 /**
- * Üçüncü Endpoint — API Logları REST Controller
- *
- * Sayfalı (paginated) log listeleme:
- * - ?page=0&size=20 → ilk 20 log
- * - ?page=1&size=10 → 11-20. loglar
- * - ?sortBy=createdAt&sortDir=desc → tarihe göre ters sıra
- * - ?endpoint=/api/v1/flights/search → endpoint filtresi
- *
- * Neden Pagination zorunlu?
- * Üretim ortamında api_logs tablosu milyonlarca kayıt barındırabilir.
- * Tüm veriyi bir seferde döndürmek JVM heap'ini tüketir (OOM riski).
- * Page<T> ile yalnızca istenen dilim döndürülür.
+ * REST Controller for API Logs
  */
 @Slf4j
 @Validated
 @RestController
 @RequestMapping("/api/v1/logs")
 @RequiredArgsConstructor
-@Tag(name = "API Logs", description = "Veritabanına asenkron olarak kaydedilmiş request ve response loglarını sayfalı biçimde sorgular.")
+@Tag(name = "API Logs", description = "Query asynchronously saved API logs with pagination support.")
 public class ApiLogController {
 
-    private final ApiLogService apiLogService;
+        private final ApiLogService apiLogService;
 
-    /**
-     * Sayfalı log listeleme.
-     *
-     * @param endpoint Opsiyonel endpoint filtresi (/api/v1/flights/search)
-     * @param page     Sayfa numarası (0-tabanlı, varsayılan: 0)
-     * @param size     Sayfa boyutu (varsayılan: 20, max: 100)
-     * @param sortBy   Sıralama alanı (varsayılan: createdAt)
-     * @param sortDir  Sıralama yönü: asc | desc (varsayılan: desc)
-     * @return Sayfalı log nesneleri + meta bilgiler (totalElements, totalPages vb.)
-     */
-    @GetMapping
-    @Operation(summary = "Logları sayfalı olarak listeler", description = """
-            Veritabanındaki API log kayıtlarını sayfa sayfa döndürür.
-            Opsiyonel endpoint filtresi ve sıralama parametreleri desteklenir.
+        @GetMapping
+        @Operation(summary = "Paginated API Logs", description = "Returns pageable API logs with optional endpoint filtering and sorting.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Logs retrieved successfully", content = @Content(schema = @Schema(implementation = ApiLogEntity.class))),
+                        @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
+                        @ApiResponse(responseCode = "500", description = "Internal server error")
+        })
+        public ResponseEntity<Page<ApiLogEntity>> getLogs(
+                        @Parameter(description = "Endpoint to filter by (e.g. /api/v1/flights/search)") @RequestParam(required = false) String endpoint,
+                        @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") @Min(0) int page,
+                        @Parameter(description = "Page size (max 100)") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+                        @Parameter(description = "Sort field") @RequestParam(defaultValue = "createdAt") String sortBy,
+                        @Parameter(description = "Sort direction (asc/desc)") @RequestParam(defaultValue = "desc") String sortDir) {
 
-            **Örnek:** `/api/v1/logs?page=0&size=20&sortBy=createdAt&sortDir=desc`
-            """)
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Loglar başarıyla listelendi", content = @Content(schema = @Schema(implementation = ApiLogEntity.class))),
-            @ApiResponse(responseCode = "400", description = "Geçersiz istek parametreleri"),
-            @ApiResponse(responseCode = "500", description = "Sunucu hatası")
-    })
-    public ResponseEntity<Page<ApiLogEntity>> getLogs(
-            @Parameter(description = "Sorgulanacak endpoint, örneğin: /api/v1/flights/search") @RequestParam(required = false) String endpoint,
+                log.info("API logs request. endpoint={}, page={}, size={}, sort={} {}",
+                                endpoint, page, size, sortBy, sortDir);
 
-            @Parameter(description = "Sayfa numarası (0 tabanlı)") @RequestParam(defaultValue = "0") @Min(0) int page,
+                Sort.Direction direction = "asc".equalsIgnoreCase(sortDir)
+                                ? Sort.Direction.ASC
+                                : Sort.Direction.DESC;
 
-            @Parameter(description = "Sayfa başına kayıt sayısı (max 100)") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+                PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
 
-            @Parameter(description = "Sıralama alanı: createdAt | endpoint | statusCode | durationMs") @RequestParam(defaultValue = "createdAt") String sortBy,
+                Page<ApiLogEntity> logs;
+                if (endpoint != null && !endpoint.isBlank()) {
+                        logs = apiLogService.getLogsByEndpoint(endpoint, pageable);
+                } else {
+                        logs = apiLogService.getAllLogs(pageable);
+                }
 
-            @Parameter(description = "Sıralama yönü: asc | desc") @RequestParam(defaultValue = "desc") String sortDir) {
+                log.info("Returned page {}/{} from {} records.", page, logs.getTotalPages(), logs.getTotalElements());
 
-        log.info("Log listeleme isteği. endpoint={}, page={}, size={}, sort={} {}",
-                endpoint, page, size, sortBy, sortDir);
-
-        // Sıralama yönü belirleme — defensive: yanlış değer gelirse varsayılan desc
-        Sort.Direction direction = "asc".equalsIgnoreCase(sortDir)
-                ? Sort.Direction.ASC
-                : Sort.Direction.DESC;
-
-        // PageRequest: page numarası, boyut, sıralama alanı ve yonu
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
-
-        Page<ApiLogEntity> logs;
-        if (endpoint != null && !endpoint.isBlank()) {
-            logs = apiLogService.getLogsByEndpoint(endpoint, pageable);
-        } else {
-            logs = apiLogService.getAllLogs(pageable);
+                return ResponseEntity.ok(logs);
         }
-
-        log.info("Toplam {} kayıttan {}/{} sayfa döndürüldü.",
-                logs.getTotalElements(), page, logs.getTotalPages());
-
-        return ResponseEntity.ok(logs);
-    }
 }

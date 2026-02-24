@@ -17,17 +17,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * GlobalExceptionHandler Unit Testi
+ * GlobalExceptionHandler Unit Test
  *
- * Exception handler'ı Spring context olmadan doğrudan test ediyoruz.
- * Handler saf Java sınıfı gibi kullanılabilir → hızlı, bağımsız test.
- *
- * RFC 7807 ProblemDetail formatını doğrularız:
- * - HTTP status kodu
- * - title ve detail alanları
- * - Boş dönen body yok
+ * Testing the handler directly without Spring context.
+ * Validates RFC 7807 ProblemDetail format:
+ * - HTTP status code
+ * - title and detail elements
+ * - Ensures a non-empty body
  */
-@DisplayName("GlobalExceptionHandler Unit Testleri")
+@DisplayName("GlobalExceptionHandler Unit Tests")
 class GlobalExceptionHandlerTest {
 
     private GlobalExceptionHandler handler;
@@ -38,12 +36,11 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("ConstraintViolationException → 400 Bad Request + ProblemDetail")
+    @DisplayName("ConstraintViolationException -> 400 Bad Request + ProblemDetail")
     void handleConstraintViolation_returns400() {
-        // Mock ConstraintViolationException
         ConstraintViolation<?> violation = mock(ConstraintViolation.class);
         when(violation.getPropertyPath()).thenReturn(mock(jakarta.validation.Path.class));
-        when(violation.getMessage()).thenReturn("boş olamaz");
+        when(violation.getMessage()).thenReturn("cannot be null");
 
         ConstraintViolationException ex = new ConstraintViolationException(
                 "Validation failed", Set.of(violation));
@@ -52,7 +49,7 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getTitle()).isEqualTo("Validation Hatası");
+        assertThat(response.getBody().getTitle()).isEqualTo("Validation Error");
         assertThat(response.getBody().getStatus()).isEqualTo(400);
         assertThat(response.getBody().getType()).isNotNull();
         assertThat(response.getBody().getType().toString())
@@ -60,18 +57,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("ConstraintViolationException boş violations → fallback message ile 400")
+    @DisplayName("ConstraintViolationException empty violations -> 400 with fallback message")
     void handleConstraintViolation_emptyViolations_returns400WithFallback() {
-        ConstraintViolationException ex = new ConstraintViolationException("Hata mesajı", Set.of());
+        ConstraintViolationException ex = new ConstraintViolationException("Error message", Set.of());
 
         ResponseEntity<ProblemDetail> response = handler.handleConstraintViolation(ex);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().getDetail()).isEqualTo("Hata mesajı");
+        assertThat(response.getBody().getDetail()).isEqualTo("Error message");
     }
 
     @Test
-    @DisplayName("MethodArgumentTypeMismatchException → 400 Bad Request + parametre adı")
+    @DisplayName("MethodArgumentTypeMismatchException -> 400 Bad Request + parameter info")
     void handleTypeMismatch_returns400WithParamInfo() {
         MethodArgumentTypeMismatchException ex = mock(MethodArgumentTypeMismatchException.class);
         when(ex.getName()).thenReturn("departureDate");
@@ -82,7 +79,7 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getTitle()).isEqualTo("Parametre Hatası");
+        assertThat(response.getBody().getTitle()).isEqualTo("Parameter Error");
         assertThat(response.getBody().getDetail()).contains("departureDate");
         assertThat(response.getBody().getDetail()).contains("not-a-date");
         assertThat(response.getBody().getType().toString())
@@ -90,17 +87,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("Exception (genel) → 500 Internal Server Error + ProblemDetail")
+    @DisplayName("Exception (general) -> 500 Internal Server Error + ProblemDetail")
     void handleGeneral_returns500() {
-        Exception ex = new RuntimeException("Beklenmeyen bir şey oldu");
+        Exception ex = new RuntimeException("Unexpected exception");
 
         ResponseEntity<ProblemDetail> response = handler.handleGeneral(ex);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getTitle()).isEqualTo("Sunucu Hatası");
+        assertThat(response.getBody().getTitle()).isEqualTo("Server Error");
         assertThat(response.getBody().getStatus()).isEqualTo(500);
-        assertThat(response.getBody().getDetail()).contains("beklenmeyen bir hata");
+        assertThat(response.getBody().getDetail()).contains("unexpected error");
         assertThat(response.getBody().getType().toString())
                 .contains("technoly.com/errors/internal-error");
     }

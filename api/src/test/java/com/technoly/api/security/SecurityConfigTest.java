@@ -12,10 +12,9 @@ import java.time.Duration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * SecurityConfig / RateLimitingFilter Birim Testleri
+ * SecurityConfig / RateLimitingFilter Unit Tests
  *
- * Resilience4j tabanlı çalışmaya dönüştürülmüştür.
- * RateLimiter yapısı doğrulanır.
+ * Validates Resilience4j RateLimiter logic.
  */
 @DisplayName("Rate Limiting Logic Tests (Resilience4j)")
 class SecurityConfigTest {
@@ -24,11 +23,10 @@ class SecurityConfigTest {
 
     @BeforeEach
     void setUp() {
-        // Her test için temiz bir RateLimiter: 5 istek limit, 10 saniye periyod
         RateLimiterConfig config = RateLimiterConfig.custom()
                 .limitForPeriod(5)
                 .limitRefreshPeriod(Duration.ofSeconds(10))
-                .timeoutDuration(Duration.ZERO) // Token bulamadığında beklemeden dön (blokajsız fail-fast)
+                .timeoutDuration(Duration.ZERO)
                 .build();
 
         RateLimiterRegistry registry = RateLimiterRegistry.of(config);
@@ -36,31 +34,29 @@ class SecurityConfigTest {
     }
 
     @Test
-    @DisplayName("İlk 5 istek başarıyla token tüketmeli")
+    @DisplayName("First 5 requests should consume tokens successfully")
     void tokenBucketAllowsRequestsUpToCapacity() {
         for (int i = 0; i < 5; i++) {
             assertThat(rateLimiter.acquirePermission())
-                    .as("İstek %d token tüketebilmeli", i + 1)
+                    .as("Request %d should consume a token", i + 1)
                     .isTrue();
         }
     }
 
     @Test
-    @DisplayName("Kota dolduğunda token tüketimi reddedilmeli")
+    @DisplayName("Requests should be rejected when capacity is exceeded")
     void tokenBucketRejectsWhenCapacityExceeded() {
-        // Tüm tokenleri tüket
         for (int i = 0; i < 5; i++) {
             rateLimiter.acquirePermission();
         }
 
-        // 6. istek bekleme olmadığından anında false dönmeli
         assertThat(rateLimiter.acquirePermission())
-                .as("Kota dolduğunda istek reddedilmeli")
+                .as("Request should be rejected when capacity is full")
                 .isFalse();
     }
 
     @Test
-    @DisplayName("RateLimiter başlangıçta tam kapasitede olmalı")
+    @DisplayName("RateLimiter should start at full capacity")
     void bucketStartsAtFullCapacity() {
         assertThat(rateLimiter.getMetrics().getAvailablePermissions()).isEqualTo(5);
     }

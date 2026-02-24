@@ -13,12 +13,12 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Endpoint
 public class FlightEndpoint {
 
-    // Uçuş tarihlerini String olarak gönderip alırken kullandığımız ve uygulamamızın standardı olan tarih format kalıbı.
+    // Standard date format used for sending and receiving flight dates as Strings.
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy'T'HH:mm");
 
     private static final String NAMESPACE_URI = "http://flightprovider.com/wsdl";
@@ -40,12 +40,12 @@ public class FlightEndpoint {
 
         LocalDateTime departureDate;
         try {
-            // Aggregator (Tüketici) tarafından iletilen yeni standardımızdaki uçuş tarihi String metnini,
-            // DATE_FORMATTER kullanarak LocalDateTime nesnesine çeviriyoruz ki üzerinde tarihsel kontroller yapabilelim (örn. gelecek tarih mi?).
+            // Parse the incoming flight date using DATE_FORMATTER to perform time-based
+            // validation.
             departureDate = LocalDateTime.parse(request.getDepartureDate(), DATE_FORMATTER);
         } catch (DateTimeParseException e) {
-            // Eğer Aggregator geçerli formatta bir tarih yollamaz ise uçuştan hata dönüyoruz.
-            // Bu yaklaşım Guardian Clause tarzı "Erken Dönüş" (Early Return) presibini yansıtır.
+            // Early return (Guardian Clause) if the aggregator sends an invalid date
+            // format.
             result.setHasError(true);
             result.setErrorMessage("Invalid departure date format. Expected (e.g. 01-06-2026T10:00).");
             return result;
@@ -58,7 +58,7 @@ public class FlightEndpoint {
         }
 
         try {
-            Random random = new Random();
+            ThreadLocalRandom random = ThreadLocalRandom.current();
 
             for (int i = 1; i <= 3; i++) {
                 LocalDateTime departureTime = departureDate
@@ -67,12 +67,12 @@ public class FlightEndpoint {
                         .withSecond(0);
 
                 Duration flightDuration = Duration.ofMinutes(
-                        120 + (long) (random.nextDouble() * 180));
+                        120L + random.nextInt(180));
 
                 LocalDateTime arrivalTime = departureTime.plus(flightDuration);
 
                 BigDecimal basePrice = BigDecimal.valueOf(100.0);
-                BigDecimal multiplier = BigDecimal.valueOf(i * 50);
+                BigDecimal multiplier = BigDecimal.valueOf(i * 50L);
                 BigDecimal randomPrice = BigDecimal.valueOf(random.nextInt(100));
                 BigDecimal totalPrice = basePrice.add(multiplier).add(randomPrice);
 
@@ -80,8 +80,7 @@ public class FlightEndpoint {
                 f1.setFlightNumber("TK" + (1000 + i));
                 f1.setOrigin("IST");
                 f1.setDestination("COV");
-                // Tarih objemizi (LocalDateTime) SOAP üzerinden dış dünyaya (Ağa) gönderirken 
-                // metne dönüştürerek serialize ediyoruz. (dd-MM-yyyy'T'HH:mm formatında)
+                // Serialize LocalDateTime to String when sending over SOAP.
                 f1.setDepartureTime(departureTime.format(DATE_FORMATTER));
                 f1.setArrivalTime(arrivalTime.format(DATE_FORMATTER));
                 f1.setPrice(totalPrice);

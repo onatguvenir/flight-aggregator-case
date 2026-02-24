@@ -5,7 +5,6 @@ import com.technoly.application.service.CheapestFlightService;
 import com.technoly.application.service.FlightAggregatorService;
 import com.technoly.domain.model.FlightDto;
 import com.technoly.domain.model.FlightSearchRequest;
-import com.technoly.domain.model.FlightSearchResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -27,14 +25,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * FlightSearchController Integration Testi
+ * FlightSearchController Integration Test
  *
- * Docker gerektirmeyen standart entegrasyon testi:
- * - H2 In-Memory DB kullanılır (Testproperties üzerinden)
- * - Redis dış bağlantısı MockBean ile atlatılır
+ * Docker-free integration test:
+ * - Uses H2 In-Memory DB
+ * - External Redis connection is bypassed via MockBean
  *
- * SOAP provider'lar (FlightAggregatorService, CheapestFlightService) mock'lanır
- * çünkü burada sadece REST katmanını test ediyoruz.
+ * SOAP providers (FlightAggregatorService, CheapestFlightService) are mocked
+ * to test only the REST layer.
  */
 @SpringBootTest(classes = FlightAggregatorApplication.class, properties = {
                 "security.enabled=false",
@@ -48,20 +46,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "management.health.redis.enabled=false"
 })
 @AutoConfigureMockMvc
-@DisplayName("FlightSearchController Integration Testleri")
+@DisplayName("FlightSearchController Integration Tests")
 class FlightSearchControllerIntegrationTest {
-
-        // ---- Spring Beans ----
 
         @Autowired
         private MockMvc mockMvc;
 
-        /**
-         * SOAP servisleri mock'lanır: Integration testinde gerçek SOAP provider yoktur.
-         * Testlerde sadece DB ve Redis mock/h2 ile başlatılır.
-         * 
-         * @MockBean: Spring context'e mock bean enjekte eder.
-         */
         @MockBean
         private FlightAggregatorService flightAggregatorService;
 
@@ -106,16 +96,12 @@ class FlightSearchControllerIntegrationTest {
                                                 .build());
         }
 
-        // ---- Tests: /api/v1/flights/search ----
-
         @Test
-        @DisplayName("GET /api/v1/flights/search - Geçerli parametrelerle 200 döner")
+        @DisplayName("GET /api/v1/flights/search - Returns 200 with valid parameters")
         void searchAllFlights_validParams_returns200() throws Exception {
-                // GIVEN: Service mock davranışı
                 when(flightAggregatorService.searchAllFlights(any(FlightSearchRequest.class)))
                                 .thenReturn(testFlights);
 
-                // WHEN & THEN: MockMvc ile HTTP isteği gönder ve yanıtı doğrula
                 mockMvc.perform(get("/api/v1/flights/search")
                                 .param("origin", "IST")
                                 .param("destination", "COV")
@@ -130,7 +116,7 @@ class FlightSearchControllerIntegrationTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/flights/search - origin eksik olunca 400 döner")
+        @DisplayName("GET /api/v1/flights/search - Returns 400 when origin is missing")
         void searchAllFlights_missingOrigin_returns400() throws Exception {
                 mockMvc.perform(get("/api/v1/flights/search")
                                 .param("destination", "COV")
@@ -140,7 +126,7 @@ class FlightSearchControllerIntegrationTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/flights/search - Geçersiz tarih formatında 400 döner")
+        @DisplayName("GET /api/v1/flights/search - Returns 400 for invalid date format")
         void searchAllFlights_invalidDateFormat_returns400() throws Exception {
                 mockMvc.perform(get("/api/v1/flights/search")
                                 .param("origin", "IST")
@@ -150,12 +136,9 @@ class FlightSearchControllerIntegrationTest {
                                 .andExpect(status().isBadRequest());
         }
 
-        // ---- Tests: /api/v1/flights/search/cheapest ----
-
         @Test
-        @DisplayName("GET /api/v1/flights/search/cheapest - Geçerli parametrelerle 200 döner")
+        @DisplayName("GET /api/v1/flights/search/cheapest - Returns 200 with valid parameters")
         void searchCheapestFlights_validParams_returns200() throws Exception {
-                // Cheapest: sadece en ucuz (250) döner
                 when(cheapestFlightService.findCheapestFlights(any(FlightSearchRequest.class)))
                                 .thenReturn(List.of(testFlights.get(0)));
 
@@ -171,7 +154,7 @@ class FlightSearchControllerIntegrationTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/flights/search/cheapest - destination eksik olunca 400 döner")
+        @DisplayName("GET /api/v1/flights/search/cheapest - Returns 400 when destination is missing")
         void searchCheapestFlights_missingDestination_returns400() throws Exception {
                 mockMvc.perform(get("/api/v1/flights/search/cheapest")
                                 .param("origin", "IST")
