@@ -56,6 +56,7 @@ spring:
   cache:
     type: redis
     redis:
+      # Redis istatistiklerini (hit/miss) Micrometer'a aç (spring.cache.redis.enable-statistics)
       enable-statistics: true
   data:
     redis:
@@ -82,7 +83,6 @@ spring:
 # ===========================
 # Cache
 # ===========================
-# Redis istatistiklerini (hit/miss) Micrometer'a aç (spring.cache.redis.enable-statistics)
 cache:
   flight:
     ttl-minutes: ${CACHE_TTL_MINUTES:5}
