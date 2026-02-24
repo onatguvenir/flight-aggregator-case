@@ -13,20 +13,20 @@
     <name>Flight Aggregator - Infrastructure</name>
 
     <!--
-        INFRASTRUCTURE MODÜLÜ
+        INFRASTRUCTURE MODULE
         =======================
-        Bu modül, dış sistemlerle iletişimi yönetir:
-        - FlightProviderA ve FlightProviderB (lokal JAR kütüphane — doğrudan Java method call)
+        This module manages communication with external systems:
+        - FlightProviderA and FlightProviderB (local JAR library — direct Java method call)
         - JPA repositories (PostgreSQL)
         - Redis cache
         - Flyway migrations
-        - Resilience4j konfigürasyonu
+        - Resilience4j configuration
 
-        NOT: Provider'lar Spring Boot/HTTP servisi değil, plain Java kütüphanesidir.
-        Bu nedenle Spring-WS/JAXB kullanılmaz; SearchService doğrudan instantiate edilir.
+        NOTE: Providers are plain Java libraries, not Spring Boot/HTTP services.
+        Therefore, Spring-WS/JAXB is not used; SearchService is instantiated directly.
     -->
     <dependencies>
-        <!-- Domain modülüne bağımlı: port interface'leri ve DTO'ları kullanır -->
+        <!-- Depends on the Domain module: uses port interfaces and DTOs -->
         <dependency>
             <groupId>com.technoly</groupId>
             <artifactId>domain</artifactId>
@@ -39,25 +39,16 @@
         </dependency>
 
         <!--
-            FlightProviderA — plain Java kütüphane bağımlılığı.
-            Bu JAR, `mvn install` ile FlightProviderA dizininden lokal repo'ya kurulmuştur.
-            Gerçek projede Nexus/Artifactory gibi artifact reposunda barındırılır.
+            FlightProviderA — plain Java library dependency.
+            This JAR has been installed to the local repo from the FlightProviderA directory via `mvn install`.
+            In a real project, it is hosted in an artifact repo like Nexus/Artifactory.
         -->
-        <dependency>
-            <groupId>com.flightprovidera</groupId>
-            <artifactId>flight-provider-a</artifactId>
-            <version>1.0.0</version>
-        </dependency>
-
         <!--
-            FlightProviderB — plain Java kütüphane bağımlılığı.
-            ProviderB'de alan adları farklı: departure/arrival (origin/destination değil).
-            Bu farkı client adapter katmanında (FlightProviderBClient) kapatıyoruz.
+            SOAP Web Services Client
         -->
         <dependency>
-            <groupId>com.flightproviderb</groupId>
-            <artifactId>flight-provider-b</artifactId>
-            <version>1.0.0</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web-services</artifactId>
         </dependency>
 
         <!-- JPA + Hibernate: PostgreSQL entity mapping -->
@@ -78,7 +69,7 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
         </dependency>
-        <!-- Flyway PostgreSQL desteği için ek modül (Flyway 10+) -->
+        <!-- Additional module for Flyway PostgreSQL support (Flyway 10+) -->
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
@@ -95,39 +86,55 @@
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>
         </dependency>
-        <!-- Resilience4j Spring annotation desteği için AOP gerekli -->
+        <!-- AOP is required for Resilience4j Spring annotation support -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
-        <!-- Micrometer: Resilience4j metrikleri Prometheus'a export için -->
+        <!-- Micrometer: For exporting Resilience4j metrics to Prometheus -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
-        <!-- Jackson: JSON serialization (log kayıtları için) -->
+        <!-- Jackson: JSON serialization (for log records) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
-        <!-- Jackson JavaTime module: LocalDateTime serialization için -->
+        <!-- Jackson JavaTime module: For LocalDateTime serialization -->
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
 
-        <!-- Test bağımlılıkları -->
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <!-- JAXB Plugin to generate Java classes from XSD for the SOAP Client -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>jaxb2-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>xjc</id>
+                        <goals>
+                            <goal>xjc</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <sources>
+                        <source>src/main/resources/wsdl/flights.xsd</source>
+                    </sources>
+                    <!-- Output directly to target so as to prevent polluting version control -->
+                    <outputDirectory>${project.build.directory}/generated-sources/jaxb</outputDirectory>
+                    <clearOutputDir>true</clearOutputDir>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

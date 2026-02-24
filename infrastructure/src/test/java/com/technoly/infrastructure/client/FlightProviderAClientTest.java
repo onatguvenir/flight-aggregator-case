@@ -1,11 +1,15 @@
 package com.technoly.infrastructure.client;
 
-import com.flightprovidera.service.Flight;
-import com.flightprovidera.service.SearchRequest;
-import com.flightprovidera.service.SearchResult;
-import com.flightprovidera.service.SearchService;
+import com.flightprovider.wsdl.Flight;
+import com.flightprovider.wsdl.SearchRequest;
+import com.flightprovider.wsdl.SearchResult;
 import com.technoly.domain.model.FlightDto;
 import com.technoly.domain.model.FlightSearchRequest;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.retry.RetryRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,9 +17,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.ws.client.core.WebServiceTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +32,7 @@ import static org.mockito.Mockito.*;
 class FlightProviderAClientTest {
 
     @Mock
-    private SearchService searchService;
+    private WebServiceTemplate webServiceTemplate;
 
     private SimpleMeterRegistry meterRegistry;
 
@@ -35,8 +41,7 @@ class FlightProviderAClientTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        // constructor injection ile test kurulumu
-        client = new FlightProviderAClient(searchService, meterRegistry);
+        client = new FlightProviderAClient(webServiceTemplate, meterRegistry);
     }
 
     @Test
@@ -49,14 +54,23 @@ class FlightProviderAClientTest {
                 .departureDate(departureDate)
                 .build();
 
-        Flight mockFlight = new Flight("A123", "IST", "LHR", departureDate, departureDate.plusHours(4),
-                new BigDecimal("150.00"));
+        Flight mockFlight = new Flight();
+        mockFlight.setFlightNumber("A123");
+        mockFlight.setOrigin("IST");
+        mockFlight.setDestination("LHR");
+        // Using DATE_FORMATTER in class properties (Mock) to convert incoming
+        // LocalDateTime
+        // object to the string expected by the SOAP service "dd-MM-yyyy'T'HH:mm".
+        DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy'T'HH:mm");
+        mockFlight.setDepartureTime(departureDate.format(DATE_FORMATTER));
+        mockFlight.setArrivalTime(departureDate.plusHours(4).format(DATE_FORMATTER));
+        mockFlight.setPrice(new BigDecimal("150.00"));
 
         SearchResult mockResult = new SearchResult();
         mockResult.setHasError(false);
-        mockResult.setFlightOptions(List.of(mockFlight));
+        mockResult.getFlights().add(mockFlight);
 
-        when(searchService.availabilitySearch(any(SearchRequest.class))).thenReturn(mockResult);
+        when(webServiceTemplate.marshalSendAndReceive(any(SearchRequest.class))).thenReturn(mockResult);
 
         // Act
         List<FlightDto> result = client.searchFlights(request);
@@ -72,11 +86,15 @@ class FlightProviderAClientTest {
 
         // Verify that the adapter constructs the external request correctly
         ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
-        verify(searchService).availabilitySearch(captor.capture());
+        verify(webServiceTemplate).marshalSendAndReceive(captor.capture());
         SearchRequest capturedRequest = captor.getValue();
         assertThat(capturedRequest.getOrigin()).isEqualTo("IST");
         assertThat(capturedRequest.getDestination()).isEqualTo("LHR");
-        assertThat(capturedRequest.getDepartureDate()).isEqualTo(departureDate);
+        // We verify that the dates of the SOAP request generated via Adapter are
+        // correctly
+        // converted to text with DATE_FORMATTER and sent in the same way.
+        assertThat(capturedRequest.getDepartureDate())
+                .isEqualTo(departureDate.format(DATE_FORMATTER));
 
         // Verify metrics
         assertThat(meterRegistry.find("flight.search.provider.latency").timer()).isNotNull();
@@ -96,14 +114,14 @@ class FlightProviderAClientTest {
         mockResult.setHasError(true);
         mockResult.setErrorMessage("Internal Server Error");
 
-        when(searchService.availabilitySearch(any(SearchRequest.class))).thenReturn(mockResult);
+        when(webServiceTemplate.marshalSendAndReceive(any(SearchRequest.class))).thenReturn(mockResult);
 
         // Act
         List<FlightDto> result = client.searchFlights(request);
 
         // Assert
         assertThat(result).isEmpty();
-        verify(searchService, times(1)).availabilitySearch(any(SearchRequest.class));
+        verify(webServiceTemplate, times(1)).marshalSendAndReceive(any(SearchRequest.class));
     }
 
     @Test
@@ -115,7 +133,7 @@ class FlightProviderAClientTest {
                 .departureDate(LocalDateTime.now().plusDays(1))
                 .build();
 
-        when(searchService.availabilitySearch(any(SearchRequest.class))).thenReturn(null);
+        when(webServiceTemplate.marshalSendAndReceive(any(SearchRequest.class))).thenReturn(null);
 
         // Act
         List<FlightDto> result = client.searchFlights(request);
@@ -125,7 +143,7 @@ class FlightProviderAClientTest {
     }
 
     @Test
-    void fallbackSearchFlights_ShouldReturnEmptyList() {
+    void fallback_ShouldReturnEmptyList() {
         // Arrange
         FlightSearchRequest request = FlightSearchRequest.builder()
                 .origin("IST")
@@ -134,9 +152,61 @@ class FlightProviderAClientTest {
                 .build();
 
         // Act
-        List<FlightDto> result = client.fallbackSearchFlights(request, new RuntimeException("Circuit Breaker Open"));
+        List<FlightDto> result = client.fallback(request, new RuntimeException("Circuit Breaker Open"));
 
         // Assert
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void searchFlights_ShouldReturnEmptyList_WhenRequestIsNull() {
+        List<FlightDto> result = client.searchFlights(null);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void searchFlights_ShouldReturnEmptyList_WhenOriginIsNull() {
+        FlightSearchRequest request = FlightSearchRequest.builder().destination("LHR").build();
+        List<FlightDto> result = client.searchFlights(request);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void searchFlights_ShouldReturnEmptyList_WhenDestinationIsNull() {
+        FlightSearchRequest request = FlightSearchRequest.builder().origin("IST").build();
+        List<FlightDto> result = client.searchFlights(request);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void searchFlights_ShouldHandleNullDepartureDate() {
+        FlightSearchRequest request = FlightSearchRequest.builder().origin("IST").destination("LHR").build();
+        SearchResult mockResult = new SearchResult();
+        when(webServiceTemplate.marshalSendAndReceive(any(SearchRequest.class))).thenReturn(mockResult);
+
+        List<FlightDto> result = client.searchFlights(request);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void mapToFlightDtos_ShouldHandleNullOrEmptyDateTime() {
+        FlightSearchRequest request = FlightSearchRequest.builder()
+                .origin("IST")
+                .destination("LHR")
+                .build();
+
+        SearchResult mockResult = new SearchResult();
+        Flight mockFlight1 = new Flight();
+        mockFlight1.setDepartureTime(null);
+        mockFlight1.setArrivalTime("");
+        mockResult.getFlights().add(mockFlight1);
+
+        when(webServiceTemplate.marshalSendAndReceive(any(SearchRequest.class))).thenReturn(mockResult);
+
+        List<FlightDto> result = client.searchFlights(request);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getDepartureDateTime()).isNotNull();
+        assertThat(result.get(0).getArrivalDateTime()).isNotNull();
     }
 }

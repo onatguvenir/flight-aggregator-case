@@ -10,17 +10,17 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * Uçuş Veri Transfer Nesnesi (DTO)
+ * Flight Data Transfer Object (DTO)
  *
- * Bu sınıf, hem ProviderA hem de ProviderB'den gelen uçuş verilerini
- * normalleştirmek için kullanılır. Her iki sağlayıcının farklı alan
- * adları (origin/destination vs departure/arrival) bu ortak model'de birleşir.
+ * This class is used to normalize flight data coming from both ProviderA
+ * and ProviderB. Different field names from both providers (origin/destination
+ * vs departure/arrival) are combined in this common model.
  *
- * @Builder: Fluent API ile nesne oluşturma (null safety için)
+ * @Builder: Object creation via Fluent API (for null safety)
  * @Data: @Getter, @Setter, @ToString, @EqualsAndHashCode (Lombok)
  *
- *        Neden DTO? Entity (DB) sınıfları ile aynı sınıfı kullanmak
- *        SRP'yi ihlal eder. DTO sadece veri taşır.
+ *        Why DTO? Using the same class with Entity (DB) classes
+ *        violates SRP. DTO only transfers data.
  */
 @Data
 @Builder
@@ -28,29 +28,29 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class FlightDto {
 
-    /** Uçuş numarası: TK1001, PC1002 vb. — gruplama anahtarının bir parçası */
+    /** Flight number: TK1001, PC1002 etc. — part of the grouping key */
     private String flightNumber;
 
-    /** Kalkış havaalanı IATA kodu: IST, SAW vb. */
+    /** Departure airport IATA code: IST, SAW etc. */
     private String origin;
 
-    /** Varış havaalanı IATA kodu: COV, LHR vb. */
+    /** Arrival airport IATA code: COV, LHR etc. */
     private String destination;
 
-    /** Kalkış tarih/saati — gruplama anahtarının bir parçası */
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    /** Departure date/time — part of the grouping key */
+    @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime departureDateTime;
 
-    /** Varış tarih/saati — gruplama anahtarının bir parçası */
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    /** Arrival date/time — part of the grouping key */
+    @JsonFormat(pattern = "dd-MM-yyyy'T'HH:mm")
     private LocalDateTime arrivalDateTime;
 
-    /** Uçuş fiyatı — cheapest seçimi için kullanılır */
+    /** Flight price — used for cheapest selection */
     private BigDecimal price;
 
     /**
-     * Kaynağı belirtir: "PROVIDER_A" veya "PROVIDER_B"
-     * Loglama ve izleme için kullanılır.
+     * Indicates the source: "PROVIDER_A" or "PROVIDER_B"
+     * Used for logging and monitoring.
      */
     private String provider;
 }

@@ -14,21 +14,22 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * En Ucuz Uçuş Servisi - Service 2
+ * Cheapest Flight Service - Service 2
  *
- * Akış:
- * 1. FlightAggregatorService'den tüm (ham, filtresiz) uçuşları al
- * 2. Composite key ile grupla (flightNumber, origin, dest, depDT, arrDT)
- * 3. Her gruptan en ucuzunu seç (minBy price)
- * 4. Fiyat filtresi dahil tüm filtreler uygulanmış listeyi döndür
+ * Flow:
+ * 1. Get all (raw, unfiltered) flights from FlightAggregatorService
+ * 2. Group by composite key (flightNumber, origin, dest, depDT, arrDT)
+ * 3. Select the cheapest from each group (minBy price)
+ * 4. Return the list with all filters applied, including price filter
  *
- * Filtre uygulama sırası (önemli!):
- * Gruplama ÖNCE yapılır (cheapest semantiği korunur),
- * fiyat/tarih filtreleri SONRA uygulanır.
+ * Filter application order (important!):
+ * Grouping is done FIRST (cheapest semantics preserved),
+ * price/date filters are applied LATER.
  *
- * Neden ayrı @Cacheable?
- * "cheapestFlights" cache, aynı keyle "flightSearch" cache'den farklı
- * sonuç döner (gruplandırılmış vs tümü). Ayrı namespace zorunludur.
+ * Why a separate @Cacheable?
+ * "cheapestFlights" cache returns a different result with the same key
+ * compared to "flightSearch" cache (grouped vs all). A separate namespace is
+ * required.
  */
 @Slf4j
 @Service
@@ -43,20 +44,20 @@ public class CheapestFlightService {
                         + " + '_' + #request.departureDateFrom + '_' + #request.departureDateTo"
                         + " + '_' + #request.arrivalDateFrom + '_' + #request.arrivalDateTo", unless = "#result.isEmpty()")
         public List<FlightDto> findCheapestFlights(FlightSearchRequest request) {
-                log.info("En ucuz uçuş araması: {} → {} @ {} [filtreler: {}]",
+                log.info("Cheapest flight search: {} → {} @ {} [filters: {}]",
                                 request.getOrigin(), request.getDestination(), request.getDepartureDate(),
-                                request.hasActiveFilters() ? "aktif" : "yok");
+                                request.hasActiveFilters() ? "active" : "none");
 
-                // Adım 1: Tüm ham uçuşları al (FlightAggregatorService kendi cache + filter'ını
-                // uygular)
+                // Step 1: Get all raw flights (FlightAggregatorService applies its own cache +
+                // filter)
                 List<FlightDto> allFlights = flightAggregatorService.searchAllFlights(request);
 
                 if (allFlights.isEmpty()) {
                         return List.of();
                 }
 
-                // Adım 2 & 3: Grupla ve her gruptan en ucuzunu seç
-                // nullsLast: fiyatsız uçuşlar gruplama/sıralamada en sona düşer
+                // Step 2 & 3: Group and select the cheapest from each group
+                // nullsLast: flights without price fall to the end in grouping/sorting
                 Comparator<BigDecimal> nullSafePrice = Comparator.nullsLast(Comparator.naturalOrder());
 
                 List<FlightDto> cheapestFlights = allFlights.stream()
@@ -72,17 +73,18 @@ public class CheapestFlightService {
                                 .sorted(Comparator.comparing(FlightDto::getPrice, nullSafePrice))
                                 .collect(Collectors.toList());
 
-                log.info("Gruplama: {}→{} uçuş (filtrelenmiş ham listeden)",
+                log.info("Grouping: {}→{} flights (from filtered raw list)",
                                 allFlights.size(), cheapestFlights.size());
 
                 return cheapestFlights;
         }
 
         /**
-         * Composite Gruplama Anahtarı (Java Record)
+         * Composite Grouping Key (Java Record)
          *
-         * Immutable, equals/hashCode otomatik üretilir.
-         * (flightNo + origin + dest + depDT + arrDT) aynı ise aynı grup.
+         * Immutable, equals/hashCode automatically generated.
+         * If (flightNo + origin + dest + depDT + arrDT) is the same, it's the same
+         * group.
          */
         private record FlightGroupKey(
                         String flightNumber,

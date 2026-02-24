@@ -1,6 +1,8 @@
 package com.technoly.infrastructure.persistence.repository;
 
 import com.technoly.infrastructure.persistence.entity.ApiLogEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -10,32 +12,38 @@ import java.util.List;
 /**
  * API Log JPA Repository
  *
- * Spring Data JPA, bu interface için otomatik implementasyon üretir.
- * JpaRepository<ApiLogEntity, Long>:
- * - ApiLogEntity: entity tipi
- * - Long: primary key tipi
+ * PagingAndSortingRepository comes integrated with JpaRepository.
+ * The added Page<> based methods eliminate the OOM (Out of Memory) risk
+ * in production scenarios: instead of pulling the whole table into memory,
+ * data is read page by page.
  *
- * findBy... metodları: Spring Data JPA, metod adından SQL oluşturur.
- * Bu yaklaşım, tekrar eden JPQL yazımını önler (Convention over Configuration).
+ * findBy...(Pageable) methods: Spring Data JPA automatically generates
+ * LIMIT/OFFSET and ORDER BY SQL statements from Pageable.
  */
 @Repository
 public interface ApiLogRepository extends JpaRepository<ApiLogEntity, Long> {
 
     /**
-     * Belirli bir endpoint için tüm log kayıtlarını döner.
-     * SQL eşdeğeri: SELECT * FROM api_logs WHERE endpoint = ?
+     * Returns all log records for a specific endpoint.
+     * SQL equivalent: SELECT * FROM api_logs WHERE endpoint = ?
      */
     List<ApiLogEntity> findByEndpoint(String endpoint);
 
     /**
-     * Zaman aralığında oluşturulan log kayıtlarını döner.
-     * SQL eşdeğeri: SELECT * FROM api_logs WHERE created_at BETWEEN ? AND ?
+     * Returns paginated log records for a specific endpoint.
+     * Example: ?page=0&size=20&sort=createdAt,desc
+     */
+    Page<ApiLogEntity> findByEndpoint(String endpoint, Pageable pageable);
+
+    /**
+     * Returns log records created within a time range.
+     * SQL equivalent: SELECT * FROM api_logs WHERE created_at BETWEEN ? AND ?
      */
     List<ApiLogEntity> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
     /**
-     * Belirli bir HTTP durum koduna sahip kayıtları döner.
-     * Örnek: Hatalı çağrıları (statusCode >= 400) izlemek için.
+     * Returns records with a specific HTTP status code.
+     * Example: To track failed calls (statusCode >= 400).
      */
     List<ApiLogEntity> findByStatusCode(Integer statusCode);
 }

@@ -19,18 +19,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 /**
- * CheapestFlightService Unit Testi
+ * CheapestFlightService Unit Test
  *
- * Unit test stratejisi:
- * - @ExtendWith(MockitoExtension): Spring context yüklenmez (hızlı)
- * - Mockito ile bağımlılıklar mock'lanır
- * - Her test tek bir davranışı doğrular (Single Responsibility)
+ * Unit test strategy:
+ * - @ExtendWith(MockitoExtension): Spring context is not loaded (fast)
+ * - Dependencies are mocked using Mockito
+ * - Each test verifies a single behavior (Single Responsibility)
  *
- * AssertJ: Fluent assertion API (JUnit'in assertSame'den daha okunabilir)
+ * AssertJ: Fluent assertion API (more readable than JUnit's assertSame)
  * - assertThat(...).hasSize(3).extracting(...).contains(...)
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CheapestFlightService Unit Testleri")
+@DisplayName("CheapestFlightService Unit Tests")
 class CheapestFlightServiceTest {
 
         @Mock
@@ -42,7 +42,7 @@ class CheapestFlightServiceTest {
 
         @BeforeEach
         void setUp() {
-                // FlightFilterService: pure function, gerçek instance kullanılır
+                // FlightFilterService: pure function, real instance is used
                 FlightFilterService filterService = new FlightFilterService();
                 cheapestFlightService = new CheapestFlightService(flightAggregatorService, filterService);
 
@@ -54,9 +54,9 @@ class CheapestFlightServiceTest {
         }
 
         @Test
-        @DisplayName("Aynı uçuş numarası, kalkış/varış bilgileri ve tarih eşleşen uçuşlardan en ucuzunu seçer")
+        @DisplayName("Selects the cheapest flight from flights with the same flight number, origin/destination, and date")
         void shouldSelectCheapestFlightFromSameGroup() {
-                // GIVEN: Aynı gruba ait 3 uçuş (farklı fiyatlar)
+                // GIVEN: 3 flights belonging to the same group (different prices)
                 LocalDateTime dep = LocalDateTime.now().plusDays(30).withHour(9);
                 LocalDateTime arr = dep.plusHours(3);
 
@@ -67,28 +67,28 @@ class CheapestFlightServiceTest {
                 when(flightAggregatorService.searchAllFlights(testRequest))
                                 .thenReturn(List.of(expensiveFlight, cheapFlight, mediumFlight));
 
-                // WHEN: En ucuz uçuşlar aranır
+                // WHEN: Cheapest flights are searched
                 List<FlightDto> result = cheapestFlightService.findCheapestFlights(testRequest);
 
-                // THEN: Sadece 1 uçuş döner (en ucuz: 200)
+                // THEN: Only 1 flight returns (cheapest: 200)
                 assertThat(result).hasSize(1);
                 assertThat(result.get(0).getPrice()).isEqualByComparingTo(BigDecimal.valueOf(200));
         }
 
         @Test
-        @DisplayName("Farklı gruplara ait uçuşlar ayrı ayrı döner")
+        @DisplayName("Flights belonging to different groups are returned separately")
         void shouldReturnOneFlightPerGroup() {
-                // GIVEN: 2 farklı grup, her grup 2 uçuş
+                // GIVEN: 2 different groups, 2 flights each
                 LocalDateTime dep1 = LocalDateTime.now().plusDays(30).withHour(9);
                 LocalDateTime arr1 = dep1.plusHours(3);
                 LocalDateTime dep2 = LocalDateTime.now().plusDays(30).withHour(12);
                 LocalDateTime arr2 = dep2.plusHours(3);
 
-                // Grup 1: TK1001, 09:00
+                // Group 1: TK1001, 09:00
                 FlightDto group1_expensive = buildFlight("TK1001", "IST", "COV", dep1, arr1, BigDecimal.valueOf(400));
                 FlightDto group1_cheap = buildFlight("TK1001", "IST", "COV", dep1, arr1, BigDecimal.valueOf(250));
 
-                // Grup 2: TK1002, 12:00
+                // Group 2: TK1002, 12:00
                 FlightDto group2_expensive = buildFlight("TK1002", "IST", "COV", dep2, arr2, BigDecimal.valueOf(600));
                 FlightDto group2_cheap = buildFlight("TK1002", "IST", "COV", dep2, arr2, BigDecimal.valueOf(300));
 
@@ -98,9 +98,9 @@ class CheapestFlightServiceTest {
                 // WHEN
                 List<FlightDto> result = cheapestFlightService.findCheapestFlights(testRequest);
 
-                // THEN: 2 grup → 2 uçuş döner
+                // THEN: 2 groups → 2 flights return
                 assertThat(result).hasSize(2);
-                // Her grubun en ucusunu içermeli
+                // Must contain the cheapest of each group
                 assertThat(result)
                                 .extracting(FlightDto::getPrice)
                                 .usingElementComparator(BigDecimal::compareTo)
@@ -108,9 +108,9 @@ class CheapestFlightServiceTest {
         }
 
         @Test
-        @DisplayName("Sonuç fiyata göre artan sırayla döner")
+        @DisplayName("Returns results sorted by price in ascending order")
         void shouldReturnResultsSortedByPrice() {
-                // GIVEN: Farklı fiyatlarda 3 ayrı uçuş grubu
+                // GIVEN: 3 different flight groups with different prices
                 LocalDateTime dep = LocalDateTime.now().plusDays(30);
                 LocalDateTime arr = dep.plusHours(2);
 
@@ -127,7 +127,7 @@ class CheapestFlightServiceTest {
                 // WHEN
                 List<FlightDto> result = cheapestFlightService.findCheapestFlights(testRequest);
 
-                // THEN: En ucuzdan pahalıya sıralı
+                // THEN: Sorted from cheapest to most expensive
                 assertThat(result).hasSize(3);
                 assertThat(result.get(0).getPrice()).isEqualByComparingTo(BigDecimal.valueOf(200));
                 assertThat(result.get(1).getPrice()).isEqualByComparingTo(BigDecimal.valueOf(450));
@@ -135,27 +135,27 @@ class CheapestFlightServiceTest {
         }
 
         @Test
-        @DisplayName("Hiç uçuş yoksa boş liste döner (null değil)")
+        @DisplayName("Returns an empty list when there are no flights (not null)")
         void shouldReturnEmptyListWhenNoFlights() {
-                // GIVEN: Provider boş liste döndürür
+                // GIVEN: Provider returns an empty list
                 when(flightAggregatorService.searchAllFlights(testRequest))
                                 .thenReturn(new ArrayList<>());
 
                 // WHEN
                 List<FlightDto> result = cheapestFlightService.findCheapestFlights(testRequest);
 
-                // THEN: Null değil, boş liste
+                // THEN: Not null, empty list
                 assertThat(result).isNotNull().isEmpty();
         }
 
         @Test
-        @DisplayName("Provider mock bir kez çağrılır")
+        @DisplayName("Provider mock is called once")
         void shouldCallAggregatorServiceOnce() {
                 when(flightAggregatorService.searchAllFlights(testRequest)).thenReturn(new ArrayList<>());
 
                 cheapestFlightService.findCheapestFlights(testRequest);
 
-                // FlightAggregatorService tam olarak 1 kez çağrılmalı
+                // FlightAggregatorService must be called exactly 1 time
                 verify(flightAggregatorService, times(1)).searchAllFlights(testRequest);
         }
 

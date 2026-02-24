@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Logback Spring Konfigürasyonu — Yapılandırılmış JSON Logging (ELK Uyumlu)
+
+    Bu dosya iki farklı log kanalını yönetir:
+    1. CONSOLE_JSON   : Renkli okunabilir JSON (tüm profiller)
+    2. LOGSTASH       : Logstash TCP appender (ELK stack — prod & docker profilleri)
+
+    LogstashEncoder: Her log satırını aşağıdaki alanları içeren düz bir JSON nesnesine çevirir:
+      {
+        "@timestamp": "2026-02-22T10:00:00.000Z",
+        "level":      "INFO",
+        "logger":     "com.technoly.api.controller.ApiLogController",
+        "message":    "Log listeleme isteği alındı.",
+        "thread":     "http-nio-8080-exec-1",
+        "app":        "flight-aggregator",
+        "traceId":    "abc123" (MDC'den — ileride OpenTelemetry eklenirse)
+      }
+
+    Bu format:
+    - Kibana'da alan bazlı filtreleme yapılabilmesini sağlar
+    - Grep ile manuel analiz yapılabilir
+    - Logstash pipeline'ında parse gerektirmez (JSON zaten açık)
+-->
+<configuration>
+
+    <!-- Uygulama adı MDC'ye eklenir — her log satırında görünür -->
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="flight-aggregator"/>
+
+    <!-- ===================================================== -->
+    <!-- APPENDER 1: Konsol JSON (okunabilir, renkli değil)    -->
+    <!-- ===================================================== -->
+    <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Ek alanlar — her log satırına eklenir -->
+            <customFields>{"app":"${appName}"}</customFields>
+            <!-- ISO 8601 zaman damgası -->
+            <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSSZ</timestampPattern>
+            <!-- Stack trace kompakt biçimde tek satıra sıkıştırılır -->
+            <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                <maxDepthPerCause>10</maxDepthPerCause>
+                <shortenedClassNameLength>20</shortenedClassNameLength>
+                <rootCauseFirst>true</rootCauseFirst>
+            </throwableConverter>
+        </encoder>
+    </appender>
+
+    <!-- ===================================================== -->
+    <!-- APPENDER 2: Logstash TCP (ELK stack)                  -->
+    <!-- Logstash üzerinden Elasticsearch'e gönderim yapar.   -->
+    <!-- docker profili veya üretim ortamında aktif olur.      -->
+    <!-- ===================================================== -->
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <!-- Logstash host:port — docker-compose'da flight_logstash:5044 -->
+        <destination>${LOGSTASH_HOST:-localhost}:${LOGSTASH_PORT:-5044}</destination>
+        <!-- Bağlantı kesilirse tekrar dener -->
+        <reconnectionDelay>10 seconds</reconnectionDelay>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"app":"${appName}"}</customFields>
+            <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSSZ</timestampPattern>
+        </encoder>
+    </appender>
+
+    <!-- ===================================================== -->
+    <!-- ASYNC WRAPPER: LOGSTASH appender'ı async'leştir       -->
+    <!-- Network I/O log thread'ini bloke etmemeli.            -->
+    <!-- ===================================================== -->
+    <appender name="ASYNC_LOGSTASH" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="LOGSTASH"/>
+        <!-- Queue dolduğunda log kaybı yerine bekle (prod için önemli) -->
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>512</queueSize>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+
+    <!-- ===================================================== -->
+    <!-- PROFIL: local — sadece konsol                          -->
+    <!-- ===================================================== -->
+    <springProfile name="local">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE_JSON"/>
+        </root>
+        <logger name="com.technoly" level="DEBUG"/>
+        <logger name="org.springframework.security" level="DEBUG"/>
+    </springProfile>
+
+    <!-- ===================================================== -->
+    <!-- PROFIL: docker, qa, prod — konsol + Logstash          -->
+    <!-- ===================================================== -->
+    <springProfile name="docker,qa,prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE_JSON"/>
+            <appender-ref ref="ASYNC_LOGSTASH"/>
+        </root>
+        <logger name="com.technoly" level="INFO"/>
+        <logger name="org.springframework.security" level="WARN"/>
+    </springProfile>
+
+</configuration>

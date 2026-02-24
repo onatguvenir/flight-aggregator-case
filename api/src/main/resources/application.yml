@@ -3,7 +3,7 @@
 # Ortama özel değerler application-{profile}.yml'de tanımlanır.
 #
 # Profil belirleme:
-#   Local : SPRING_PROFILES_ACTIVE=local  (varsayılan)
+#   Docker : SPRING_PROFILES_ACTIVE=docker  (varsayılan)
 #   QA    : SPRING_PROFILES_ACTIVE=qa
 #   Prod  : SPRING_PROFILES_ACTIVE=prod
 # =====================================================================
@@ -11,9 +11,9 @@ spring:
   application:
     name: flight-aggregator
 
-  # Aktif profil belirtilmezse 'local' kullan
+  # Aktif profil belirtilmezse 'docker' kullan
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}
+    active: ${SPRING_PROFILES_ACTIVE:docker}
 
   # ===========================
   # PostgreSQL Datasource (Base)
@@ -53,6 +53,11 @@ spring:
   # ===========================
   # Redis (Base)
   # ===========================
+  cache:
+    type: redis
+    redis:
+      # Redis istatistiklerini (hit/miss) Micrometer'a aç (spring.cache.redis.enable-statistics)
+      enable-statistics: true
   data:
     redis:
       host: ${REDIS_HOST}
@@ -63,6 +68,17 @@ spring:
           max-active: ${REDIS_POOL_MAX:8}
           max-idle: 8
           min-idle: 0
+
+  # ===========================
+  # Spring Security / OAuth2
+  # ===========================
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Symmetric key JWT decoding (HMAC/HS256)
+          secret-string: ${JWT_SECRET:my-32-character-ultra-secure-and-ultra-long-secret}
+          jws-algorithms: HS256
 
 # ===========================
 # Cache
@@ -87,13 +103,30 @@ server:
   port: ${SERVER_PORT:8080}
 
 # ===========================
+# Security (JWT / OAuth2)
+# ===========================
+# security.enabled=false → JWT devre dışı (local dev, test)
+# security.enabled=true  → Bearer JWT zorunlu (qa, prod)
+security:
+  enabled: ${SECURITY_ENABLED:true}
+
+# ===========================
+# Rate Limiting
+# ===========================
+rate-limit:
+  # IP başına kovadaki maksimum token sayısı (burst limit)
+  capacity: ${RATE_LIMIT_CAPACITY:60}
+  # Dakikada dolan token sayısı
+  refill-per-minute: ${RATE_LIMIT_REFILL:60}
+
+# ===========================
 # Actuator & Metrics (Base)
 # ===========================
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents
+        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents,bulkheads
   endpoint:
     health:
       show-details: ${HEALTH_SHOW_DETAILS:always}
@@ -166,6 +199,14 @@ resilience4j:
       providerB:
         max-concurrent-calls: ${BULKHEAD_MAX_CALLS:10}
         max-wait-duration: 1s
+
+# ===========================
+# OAuth Demo Client (Token Üretimi için)
+# ===========================
+auth:
+  client-id: ${AUTH_CLIENT_ID:flight-client}
+  client-secret: ${AUTH_CLIENT_SECRET:flight-secret}
+  token-validity-seconds: ${AUTH_TOKEN_TTL:3600}
 
 # ===========================
 # Loglama (Base)

@@ -8,34 +8,34 @@ import java.util.List;
 /**
  * Flight Provider Port Interface (Hexagonal Architecture / Port & Adapter)
  *
- * Bu interface, application katmanının infrastructure katmanına bağımlı
- * olmamasını sağlar. Strategy Pattern uygulanır:
+ * This interface ensures that the application layer is not dependent on
+ * the infrastructure layer. Strategy Pattern is implemented:
  * - FlightProviderAClient -> FlightProviderPort implements
  * - FlightProviderBClient -> FlightProviderPort implements
  *
- * Application servisi her iki implementasyonla da List<FlightProviderPort>
- * aracılığıyla çalışabilir. Yeni bir provider eklendiğinde sadece
- * bu interface'i implement eden yeni bir sınıf yazılır (OCP - Open/Closed
+ * Application service can work with both implementations via
+ * List<FlightProviderPort>. When a new provider is added, only a new
+ * class implementing this interface is written (OCP - Open/Closed
  * Principle).
  *
  * Dependency Inversion Principle (DIP):
- * - Yüksek seviye (application) → soyutlamaya (port) bağımlı
- * - Düşük seviye (infrastructure) → soyutlamayı implemente eder
+ * - High level (application) → depends on abstraction (port)
+ * - Low level (infrastructure) → implements abstraction
  */
 public interface FlightProviderPort {
 
     /**
-     * Sağlayıcıdan uçuş müsaitlik araması yapar.
+     * Performs a flight availability search from the provider.
      *
-     * @param request Arama parametreleri (origin, destination, departureDate)
-     * @return Sağlayıcıdan dönen normalize edilmiş FlightDto listesi.
-     *         Hata veya boş sonuç durumunda boş liste döner (null değil).
+     * @param request Search parameters (origin, destination, departureDate)
+     * @return Normalized FlightDto list returned from the provider.
+     *         Returns an empty list (not null) in case of error or empty result.
      */
     List<FlightDto> searchFlights(FlightSearchRequest request);
 
     /**
-     * Bu provider'ın adını döner (loglama ve metrikler için).
-     * Örnek: "PROVIDER_A", "PROVIDER_B"
+     * Returns the name of this provider (for logging and metrics).
+     * Example: "PROVIDER_A", "PROVIDER_B"
      */
     String getProviderName();
 }

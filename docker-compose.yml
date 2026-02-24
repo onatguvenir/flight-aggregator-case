@@ -4,22 +4,23 @@ version: '3.9'
 # Flight Aggregator - Docker Compose
 # =====================================================================
 #
-# Çalıştırma:
-#   Local : docker-compose --env-file .env.local up -d
+# Execution:
+#   Local : docker-compose --env-file .env up -d
 #   QA    : docker-compose --env-file .env.qa up -d
 #   Prod  : docker-compose --env-file .env.prod up -d
 #
-# Ortam değişkenleri .env.{local|qa|prod} dosyasından gelir.
-# docker-compose'a hard-coded değer YOKTUR — 12-factor app prensibi.
+# Environment variables come from .env, .env.qa, .env.prod files.
+# There are NO hard-coded values in docker-compose — 12-factor app principle.
 #
-# Servisler:
+# Services:
 #   - postgres          : PostgreSQL 16
 #   - redis             : Redis 7
-#   - flight-provider-a : ProviderA SOAP (:8081)
-#   - flight-provider-b : ProviderB SOAP (:8082)
 #   - flight-aggregator : REST API (:8080)
-#   - prometheus        : Metrik toplama (:9090)
+#   - prometheus        : Metrics collection (:9090)
 #   - grafana           : Dashboard UI (:3000)
+#   - elasticsearch     : Log storage (:9200)
+#   - logstash          : Log aggregator (:5044)
+#   - kibana            : Log UI (:5601)
 # =====================================================================
 
 services:
@@ -57,7 +58,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    # AOF persistence — container restart sonrasında cache korunur
+    # AOF persistence — cache is preserved after container restart
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -71,6 +72,68 @@ services:
 
 
   # ========================
+  # FlightProvider A (SOAP :8081)
+  # ========================
+  flight-provider-a:
+    build:
+      context: .
+      dockerfile: FlightProviderA/Dockerfile
+    container_name: flight_provider_a
+    ports:
+      - "8081:8081"
+      - "5006:5006"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
+      # ELK settings for provider logging
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: 5044
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      logstash:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
+  # FlightProvider B (SOAP :8082)
+  # ========================
+  flight-provider-b:
+    build:
+      context: .
+      dockerfile: FlightProviderB/Dockerfile
+    container_name: flight_provider_b
+    ports:
+      - "8082:8082"
+      - "5007:5007"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
+      # ELK settings for provider logging
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: 5044
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      logstash:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8082/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
   # Flight Aggregator (REST :8080)
   # ========================
   flight-aggregator:
@@ -80,9 +143,11 @@ services:
     container_name: flight_aggregator
     ports:
       - "8080:8080"
-    # Tüm değerler .env.{local|qa|prod} dosyasından gelir
+      - "5005:5005"
+    # All values come from .env.{local|qa|prod} file
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      # debugging disabled in compose; avoid JVM suspension
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
       DB_URL: ${DB_URL}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
@@ -94,10 +159,26 @@ services:
       CACHE_TTL_MINUTES: ${CACHE_TTL_MINUTES:-5}
       LOG_LEVEL_APP: ${LOG_LEVEL_APP:-INFO}
       LOG_LEVEL_SPRING: ${LOG_LEVEL_SPRING:-WARN}
+      # ELK: Logstash target address
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: 5044
+      # Security: false → JWT disabled (for local dev), true → JWT required
+      SECURITY_ENABLED: ${SECURITY_ENABLED:-false}
+      # Rate Limiting
+      RATE_LIMIT_CAPACITY: ${RATE_LIMIT_CAPACITY:-60}
+      RATE_LIMIT_REFILL: ${RATE_LIMIT_REFILL:-60}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      logstash:
+        condition: service_healthy
+      flight-provider-a:
+        condition: service_healthy
+      flight-provider-b:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
@@ -110,7 +191,7 @@ services:
     restart: unless-stopped
 
   # ========================
-  # Prometheus — Metrik toplama
+  # Prometheus — Metrics collection
   # ========================
   prometheus:
     image: prom/prometheus:v2.50.1
@@ -118,15 +199,15 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      # prometheus.yml: scrape config (hangi servisleri izle)
+      # prometheus.yml: scrape config (which services to monitor)
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      # 15 günlük veri saklama (production'da artır veya remote storage kullan)
+      # 15 days data retention (increase in production or use remote storage)
       - '--storage.tsdb.retention.time=15d'
-      - '--web.enable-lifecycle'     # API ile config reload: POST /-/reload
+      - '--web.enable-lifecycle'     # Config reload via API: POST /-/reload
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
       interval: 15s
@@ -147,20 +228,20 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Admin kullanıcı — .env dosyasından gelir
+      # Admin user — comes from .env file
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
-      # Anonim erişim yok (güvenlik)
+      # No anonymous access (security)
       GF_AUTH_ANONYMOUS_ENABLED: "false"
-      # Kullanıcı kayıt formu kapalı
+      # User registration form disabled
       GF_USERS_ALLOW_SIGN_UP: "false"
-      # Saat dilimi
+      # Timezone
       GF_DEFAULT_TIMEZONE: browser
     volumes:
-      # Provisioning: datasource + dashboard otomatik yüklenir
+      # Provisioning: datasource + dashboard automatically loaded
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      # Persistent storage: dashboard düzenlemeleri kaybolmaz
+      # Persistent storage: dashboard edits are not lost
       - grafana_data:/var/lib/grafana
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
@@ -173,6 +254,80 @@ services:
       - flight_network
     restart: unless-stopped
 
+  # ========================
+  # Elasticsearch 8 (ELK)
+  # ========================
+  elasticsearch:
+    image: elasticsearch:8.12.1
+    container_name: flight_elasticsearch
+    environment:
+      # Single-node development mode — a cluster is set up in production
+      discovery.type: single-node
+      # Disable X-Pack security for dev
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
+  # Logstash 8 (ELK)
+  # ========================
+  logstash:
+    image: logstash:8.12.1
+    container_name: flight_logstash
+    ports:
+      - "5044:5044"   # TCP input from Spring Boot
+      - "9600:9600"   # Logstash API (monitoring)
+    volumes:
+      # Pipeline configuration: logstash/pipeline/logstash.conf
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+    environment:
+      LS_JAVA_OPTS: "-Xms256m -Xmx256m"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9600 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+  # ========================
+  # Kibana 8 (ELK Log UI)
+  # ========================
+  kibana:
+    image: kibana:8.12.1
+    container_name: flight_kibana
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+    networks:
+      - flight_network
+    restart: unless-stopped
+
+
 # ========================
 # Named Volumes
 # ========================
@@ -181,6 +336,7 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+  elasticsearch_data:
 
 # ========================
 # Network

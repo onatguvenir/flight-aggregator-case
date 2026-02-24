@@ -2,7 +2,7 @@ package com.technoly.application.service;
 
 import com.technoly.domain.model.FlightDto;
 import com.technoly.domain.model.FlightSearchRequest;
-import com.technoly.domain.port.FlightProviderPort;
+import com.technoly.domain.port.FlightSearchPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,27 +21,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 /**
- * FlightAggregatorService Unit Testi
+ * FlightAggregatorService Unit Test
  *
- * Test stratejisi:
- * - Her FlightProviderPort implementasyonu mock'lanır
- * - Paralel çağrı mantığı doğrulanır (her provider bir kez çağrılır)
- * - Birleştirme sonrası liste boyutu kontrol edilir
- * - Provider hata verirse diğerini etkilemediği test edilir
+ * Test strategy:
+ * - Calling raw flights via FlightSearchPort (Adapter).
+ * - Verifying the logic of applying FlightFilterService.
  */
 @ExtendWith(MockitoExtension.class)
-// LENIENT: setUp() içindeki getProviderName() stubbing'i bazı testlerde
-// kullanılmyor
-// (ortak kurulum mesajı — sadece ilgili testlerde gerçekleşir)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@DisplayName("FlightAggregatorService Unit Testleri")
+@DisplayName("FlightAggregatorService Unit Tests")
 class FlightAggregatorServiceTest {
 
     @Mock
-    private FlightProviderPort providerA;
+    private FlightSearchPort flightSearchPort;
 
-    @Mock
-    private FlightProviderPort providerB;
+    private FlightFilterService filterService;
 
     private FlightAggregatorService aggregatorService;
 
@@ -49,92 +43,46 @@ class FlightAggregatorServiceTest {
 
     @BeforeEach
     void setUp() {
-        // FlightFilterService: pure function, gerçek instance kullanılır (mock'a gerek
-        // yok)
-        FlightFilterService filterService = new FlightFilterService();
-        // İki mock provider ile servis oluştur (Strategy Pattern)
-        aggregatorService = new FlightAggregatorService(List.of(providerA, providerB), filterService);
+        filterService = mock(FlightFilterService.class);
+        aggregatorService = new FlightAggregatorService(flightSearchPort, filterService);
 
         testRequest = FlightSearchRequest.builder()
                 .origin("IST")
                 .destination("COV")
                 .departureDate(LocalDateTime.now().plusDays(30))
                 .build();
-
-        // Provider adları mock'larda ayarlanır
-        when(providerA.getProviderName()).thenReturn("PROVIDER_A");
-        when(providerB.getProviderName()).thenReturn("PROVIDER_B");
     }
 
     @Test
-    @DisplayName("Her iki sağlayıcıya tam olarak bir kez çağrı yapılır")
-    void shouldCallBothProvidersOnce() {
+    @DisplayName("FlightSearchPort is called and filters are applied")
+    void shouldCallPortAndApplyFilters() {
         // GIVEN
-        when(providerA.searchFlights(testRequest)).thenReturn(new ArrayList<>());
-        when(providerB.searchFlights(testRequest)).thenReturn(new ArrayList<>());
+        List<FlightDto> rawFlights = createFlights(5, "ANY");
+        List<FlightDto> filteredFlights = rawFlights.subList(0, 2);
 
-        // WHEN
-        aggregatorService.searchAllFlights(testRequest);
-
-        // THEN: Her provider tam 1 kez çağrılmış olmalı
-        verify(providerA, times(1)).searchFlights(testRequest);
-        verify(providerB, times(1)).searchFlights(testRequest);
-    }
-
-    @Test
-    @DisplayName("Her iki sağlayıcıdan gelen sonuçlar birleştirilir")
-    void shouldMergeFlightsFromBothProviders() {
-        // GIVEN: ProviderA 3, ProviderB 4 uçuş döner
-        List<FlightDto> providerAFlights = createFlights(3, "PROVIDER_A");
-        List<FlightDto> providerBFlights = createFlights(4, "PROVIDER_B");
-
-        when(providerA.searchFlights(testRequest)).thenReturn(providerAFlights);
-        when(providerB.searchFlights(testRequest)).thenReturn(providerBFlights);
+        when(flightSearchPort.searchAllFlights(testRequest)).thenReturn(rawFlights);
+        when(filterService.applyFilters(rawFlights, testRequest)).thenReturn(filteredFlights);
 
         // WHEN
         List<FlightDto> result = aggregatorService.searchAllFlights(testRequest);
 
-        // THEN: 3 + 4 = 7 uçuş toplam
-        assertThat(result).hasSize(7);
+        // THEN
+        verify(flightSearchPort, times(1)).searchAllFlights(testRequest);
+        verify(filterService, times(1)).applyFilters(rawFlights, testRequest);
+        assertThat(result).hasSize(2);
     }
 
     @Test
-    @DisplayName("Bir sağlayıcı boş liste döndürdüğünde diğerinin sonuçları döner")
-    void shouldReturnResultsWhenOneProviderReturnsEmpty() {
-        // GIVEN: ProviderA boş, ProviderB 5 uçuş
-        when(providerA.searchFlights(testRequest)).thenReturn(new ArrayList<>());
-        when(providerB.searchFlights(testRequest)).thenReturn(createFlights(5, "PROVIDER_B"));
-
-        // WHEN
-        List<FlightDto> result = aggregatorService.searchAllFlights(testRequest);
-
-        // THEN: Sadece ProviderB'nin 5 uçuşu döner
-        assertThat(result).hasSize(5);
-        assertThat(result).allMatch(f -> "PROVIDER_B".equals(f.getProvider()));
-    }
-
-    @Test
-    @DisplayName("Bir sağlayıcı exception fırlattığında diğerinin sonuçları döner")
-    void shouldReturnOtherProviderResultsWhenOneThrowsException() {
-        // GIVEN: ProviderA RuntimeException, ProviderB normal çalışıyor
-        when(providerA.searchFlights(testRequest)).thenThrow(new RuntimeException("ProviderA is down"));
-        when(providerB.searchFlights(testRequest)).thenReturn(createFlights(3, "PROVIDER_B"));
-
-        // WHEN: Exception fırlansa bile uygulama çökmemeli
-        List<FlightDto> result = aggregatorService.searchAllFlights(testRequest);
-
-        // THEN: ProviderB'nin uçuşları döner
-        assertThat(result).hasSize(3);
-    }
-
-    @Test
-    @DisplayName("Her iki sağlayıcı boş döndürürdüğünde boş liste döner")
-    void shouldReturnEmptyListWhenBothProvidersReturnEmpty() {
-        when(providerA.searchFlights(testRequest)).thenReturn(new ArrayList<>());
-        when(providerB.searchFlights(testRequest)).thenReturn(new ArrayList<>());
+    @DisplayName("Returns empty list when no flights are returned")
+    void shouldReturnEmptyListWhenPortReturnsEmpty() {
+        List<FlightDto> emptyRawFlights = new ArrayList<>();
+        when(flightSearchPort.searchAllFlights(testRequest)).thenReturn(emptyRawFlights);
+        when(filterService.applyFilters(emptyRawFlights, testRequest)).thenReturn(emptyRawFlights);
 
         List<FlightDto> result = aggregatorService.searchAllFlights(testRequest);
 
+        verify(flightSearchPort, times(1)).searchAllFlights(testRequest);
+        verify(filterService, times(1)).applyFilters(emptyRawFlights, testRequest);
         assertThat(result).isNotNull().isEmpty();
     }
 

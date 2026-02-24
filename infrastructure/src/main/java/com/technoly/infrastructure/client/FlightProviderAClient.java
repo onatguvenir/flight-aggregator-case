@@ -1,127 +1,61 @@
 package com.technoly.infrastructure.client;
 
-import com.flightprovidera.service.SearchRequest;
-import com.flightprovidera.service.SearchResult;
-import com.flightprovidera.service.SearchService;
 import com.technoly.domain.model.FlightDto;
 import com.technoly.domain.model.FlightSearchRequest;
 import com.technoly.domain.port.FlightProviderPort;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.springframework.ws.client.core.WebServiceTemplate;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
- * FlightProvider A — Java Kütüphane Adaptörü
+ * Provider A SOAP Client.
  *
- * FlightProviderA, bir HTTP/SOAP servisi DEĞİL, plain Java kütüphanesidir.
- * Bu adapter (Adapter Pattern), domain'in FlightProviderPort interface'ini
- * ProviderA'nın SearchService API'sine uyarlar.
+ * This class uses the common SOAP call/mapping logic from
+ * {@link AbstractClient}
+ * and applies provider-based resilience policies using Resilience4j.
  *
- * Spring DI kullanarak SearchService ve MeterRegistry (Micrometer
- * Observability) bağımlılıklarını yönetiriz (SOLID - DIP).
+ * Resilience4j annotations used:
+ * - {@code @CircuitBreaker}: Opens the circuit in case of continuous errors,
+ * protecting the system.
+ * - {@code @Retry}: Retries on transient errors.
+ * - {@code @Bulkhead}: Limits how many concurrent calls can be made (resource
+ * protection).
+ *
+ * Fallback:
+ * - CircuitBreaker/Bulkhead fallback method supports a "partial success"
+ * approach by returning an empty list in case of upstream error.
  */
-@Slf4j
 @Component
-public class FlightProviderAClient implements FlightProviderPort {
+class FlightProviderAClient extends AbstractClient implements FlightProviderPort {
 
     private static final String PROVIDER_NAME = "PROVIDER_A";
 
-    private final SearchService searchService;
-    private final MeterRegistry meterRegistry;
-
-    /**
-     * Constructor Injection
-     * 
-     * @param searchService Provider'a özel state-less kütüphane servisi (@Qualifier
-     *                      ile ayırt edilir)
-     * @param meterRegistry Metrik toplama (Prometheus / OpenTelemetry için)
-     */
     public FlightProviderAClient(
-            @Qualifier("providerASearchService") SearchService searchService,
+            @Qualifier("webServiceTemplateA") WebServiceTemplate webServiceTemplate,
             MeterRegistry meterRegistry) {
-        this.searchService = searchService;
-        this.meterRegistry = meterRegistry;
+        super(webServiceTemplate, meterRegistry);
     }
 
     @Override
-    @CircuitBreaker(name = "providerA", fallbackMethod = "fallbackSearchFlights")
+    @CircuitBreaker(name = "providerA", fallbackMethod = "fallback")
     @Retry(name = "providerA")
+    @Bulkhead(name = "providerA", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "fallback")
     public List<FlightDto> searchFlights(FlightSearchRequest request) {
-        log.info("[ProviderA] Uçuş araması: {} → {} @ {}",
-                request.getOrigin(), request.getDestination(), request.getDepartureDate());
-
-        SearchRequest providerRequest = buildProviderRequest(request);
-
-        // Metrik tayini (observability)
-        Timer.Sample sample = Timer.start(meterRegistry);
-
-        SearchResult result;
-        try {
-            // Direkt Java method call
-            result = searchService.availabilitySearch(providerRequest);
-        } finally {
-            sample.stop(meterRegistry.timer("flight.search.provider.latency", "provider", PROVIDER_NAME));
-        }
-
-        return mapToFlightDtos(result);
+        return performSearch(request, PROVIDER_NAME);
     }
 
-    /**
-     * Fallback method: CircuitBreaker açıkken veya tüm retry'lar tükenince
-     * çağrılır.
-     * Null Object Pattern kullanarak empty list döner (application null check
-     * yapmaz).
-     */
-    public List<FlightDto> fallbackSearchFlights(FlightSearchRequest request, Throwable throwable) {
-        log.warn("[ProviderA] Fallback devrede. Hata: {}", throwable.getMessage());
-        return new ArrayList<>();
+    public List<FlightDto> fallback(FlightSearchRequest request, Throwable throwable) {
+        return fallbackSearchFlights(request, throwable, PROVIDER_NAME);
     }
 
     @Override
     public String getProviderName() {
         return PROVIDER_NAME;
-    }
-
-    private SearchRequest buildProviderRequest(FlightSearchRequest request) {
-        return new SearchRequest(
-                request.getOrigin(),
-                request.getDestination(),
-                request.getDepartureDate());
-    }
-
-    private List<FlightDto> mapToFlightDtos(SearchResult result) {
-        if (result == null) {
-            log.warn("[ProviderA] SearchResult null döndü");
-            return new ArrayList<>();
-        }
-
-        if (result.isHasError()) {
-            log.warn("[ProviderA] Provider hata döndürdü: {}", result.getErrorMessage());
-            return new ArrayList<>();
-        }
-
-        return Optional.ofNullable(result.getFlightOptions())
-                .orElse(new ArrayList<>())
-                .stream()
-                .map(flight -> FlightDto.builder()
-                        .flightNumber(flight.getFlightNo())
-                        .origin(flight.getOrigin())
-                        .destination(flight.getDestination())
-                        .departureDateTime(flight.getDeparturedatetime())
-                        .arrivalDateTime(flight.getArrivaldatetime())
-                        .price(Optional.ofNullable(flight.getPrice()).orElse(BigDecimal.ZERO))
-                        .provider(PROVIDER_NAME)
-                        .build())
-                .collect(Collectors.toList());
     }
 }

@@ -11,6 +11,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,46 +21,54 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 /**
- * Üçüncü Endpoint - API Logları REST Controller
- *
- * Diğer iki endpoint'e yapılan request ve responseların listelenmesini sağlar.
+ * REST Controller for API Logs
  */
 @Slf4j
 @Validated
 @RestController
 @RequestMapping("/api/v1/logs")
 @RequiredArgsConstructor
-@Tag(name = "API Logs", description = "Veritabanına asenkron olarak kaydedilmiş request ve response loglarını sorgular.")
+@Tag(name = "API Logs", description = "Query asynchronously saved API logs with pagination support.")
 public class ApiLogController {
 
-    private final ApiLogService apiLogService;
+        private final ApiLogService apiLogService;
 
-    @GetMapping
-    @Operation(summary = "Tüm logları listeler", description = """
-            Veritabanındaki PostgreSQL log tablosuna atılmış olan tüm request ve response kayıtlarını getirir.
-            Opsiyonel olarak endpoint path'ine göre filtreleme yapılabilir.
-            """)
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Loglar başarıyla listelendi", content = @Content(schema = @Schema(implementation = ApiLogEntity.class))),
-            @ApiResponse(responseCode = "400", description = "Geçersiz istek parametreleri"),
-            @ApiResponse(responseCode = "500", description = "Sunucu hatası")
-    })
-    public ResponseEntity<List<ApiLogEntity>> getLogs(
-            @Parameter(description = "Sorgulanacak endpoint, örneğin: /api/v1/flights/search", required = false) @RequestParam(required = false) String endpoint) {
+        @GetMapping
+        @Operation(summary = "Paginated API Logs", description = "Returns pageable API logs with optional endpoint filtering and sorting.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Logs retrieved successfully", content = @Content(schema = @Schema(implementation = ApiLogEntity.class))),
+                        @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
+                        @ApiResponse(responseCode = "500", description = "Internal server error")
+        })
+        public ResponseEntity<Page<ApiLogEntity>> getLogs(
+                        @Parameter(description = "Endpoint to filter by (e.g. /api/v1/flights/search)") @RequestParam(required = false) String endpoint,
+                        @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") @Min(0) int page,
+                        @Parameter(description = "Page size (max 100)") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+                        @Parameter(description = "Sort field") @RequestParam(defaultValue = "createdAt") String sortBy,
+                        @Parameter(description = "Sort direction (asc/desc)") @RequestParam(defaultValue = "desc") String sortDir) {
 
-        log.info("Log listeleme isteği alındı. Endpoint filtresi: {}", endpoint);
+                log.info("API logs request. endpoint={}, page={}, size={}, sort={} {}",
+                                endpoint, page, size, sortBy, sortDir);
 
-        List<ApiLogEntity> logs;
-        if (endpoint != null && !endpoint.isBlank()) {
-            logs = apiLogService.getLogsByEndpoint(endpoint);
-        } else {
-            logs = apiLogService.getAllLogs();
+                Sort.Direction direction = "asc".equalsIgnoreCase(sortDir)
+                                ? Sort.Direction.ASC
+                                : Sort.Direction.DESC;
+
+                PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+
+                Page<ApiLogEntity> logs;
+                if (endpoint != null && !endpoint.isBlank()) {
+                        logs = apiLogService.getLogsByEndpoint(endpoint, pageable);
+                } else {
+                        logs = apiLogService.getAllLogs(pageable);
+                }
+
+                log.info("Returned page {}/{} from {} records.", page, logs.getTotalPages(), logs.getTotalElements());
+
+                return ResponseEntity.ok(logs);
         }
-
-        log.info("{} adet log bulundu.", logs.size());
-        return ResponseEntity.ok(logs);
-    }
 }

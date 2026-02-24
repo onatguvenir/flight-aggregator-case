@@ -1,51 +1,50 @@
 # =====================================================================
-# Prometheus Scrape Konfigürasyonu
+# Prometheus Scrape Configuration
 # =====================================================================
-# Prometheus, bu config ile Flight Aggregator ve provider servislerinden
-# Micrometer metriklerini düzenli aralıklarla çeker.
+# Prometheus, with this config, periodically pulls Micrometer metrics
+# from Flight Aggregator and provider services.
 #
-# Spring Boot Actuator /actuator/prometheus endpoint'ini expose eder.
+# Spring Boot Actuator exposes the /actuator/prometheus endpoint.
 # =====================================================================
 
 global:
-  # Her servis için varsayılan scrape aralığı
+  # Default scrape interval for each service
   scrape_interval: 15s
   evaluation_interval: 15s
 
 scrape_configs:
-
   # ----- Flight Aggregator (Ana uygulama) -----
-  - job_name: 'flight-aggregator'
-    metrics_path: '/actuator/prometheus'
+  - job_name: "flight-aggregator"
+    metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: ['flight-aggregator:8080']
-    # Micrometer ek label'ları
+      - targets: ["flight-aggregator:8080"]
+    # Micrometer additional labels
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance
-        replacement: 'flight-aggregator'
+        replacement: "flight-aggregator"
 
-  # ----- Flight Provider A (SOAP servis) -----
-  - job_name: 'flight-provider-a'
-    metrics_path: '/actuator/prometheus'
+  # ----- Flight Provider A (SOAP service) -----
+  - job_name: "flight-provider-a"
+    metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: ['flight-provider-a:8081']
+      - targets: ["flight-provider-a:8081"]
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance
-        replacement: 'flight-provider-a'
+        replacement: "flight-provider-a"
 
-  # ----- Flight Provider B (SOAP servis) -----
-  - job_name: 'flight-provider-b'
-    metrics_path: '/actuator/prometheus'
+  # ----- Flight Provider B (SOAP service) -----
+  - job_name: "flight-provider-b"
+    metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: ['flight-provider-b:8082']
+      - targets: ["flight-provider-b:8082"]
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance
-        replacement: 'flight-provider-b'
+        replacement: "flight-provider-b"
 
-  # ----- Prometheus kendisi -----
-  - job_name: 'prometheus'
+  # ----- Prometheus itself -----
+  - job_name: "prometheus"
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ["localhost:9090"]

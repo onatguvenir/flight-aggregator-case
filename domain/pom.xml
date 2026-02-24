@@ -13,25 +13,27 @@
     <name>Flight Aggregator - Domain</name>
 
     <!--
-        DOMAIN MODÜLÜ
+        DOMAIN MODULE
         ===============
-        Clean Architecture'da domain katmanı:
-        - Dış dünyadan (Spring, DB, HTTP) bağımsız saf Java sınıfları
-        - Diğer modüllerin "dil"ini tanımlar (FlightDto, SearchRequest, port interfaces)
-        - Hiçbir framework dependency'si OLMAMALI
-        - Bu modül hem infrastructure hem application hem de api modülüne bağımlıdır
+        Domain layer in Clean Architecture:
+        - Pure Java classes independent of the outside world (Spring, DB, HTTP)
+        - Defines the "language" of other modules (FlightDto, SearchRequest, port interfaces)
+        - MUST NOT have any framework dependencies
+        - The infrastructure, application, and api modules depend on this module
 
-        Burada istisnai olarak Bean Validation ekliyoruz çünkü
-        @NotNull, @NotBlank gibi standard constraint annotation'lar
-        domain modelinin bir parçasıdır.
+        We exceptionally add Bean Validation here because
+        standard constraint annotations like @NotNull, @NotBlank
+        are part of the domain model.
     -->
     <dependencies>
-        <!-- Bean Validation: @NotNull, @NotBlank, @Future annotation'ları için -->
+        <!-- Bean Validation: For @NotNull, @NotBlank, @Future annotations -->
         <dependency>
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>
         </dependency>
-        <!-- Jackson: FlightDto JSON serialization için (log json'ları) -->
+        <!-- Jackson annotations: For @JsonSerialize (@Masked annotation) -->
+        <!-- @JsonSerialize comes from the jackson-annotations library -->
+        <!-- jackson-databind is not added here (Lombok proc incompatibility) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>

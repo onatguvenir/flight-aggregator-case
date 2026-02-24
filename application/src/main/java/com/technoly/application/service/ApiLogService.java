@@ -6,26 +6,27 @@ import com.technoly.infrastructure.persistence.entity.ApiLogEntity;
 import com.technoly.infrastructure.persistence.repository.ApiLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
- * API Log Servisi
+ * API Log Service
  *
- * Her REST API isteğini ve yanıtını asenkron olarak PostgreSQL'e kaydeder.
+ * Asynchronously saves every REST API request and response to PostgreSQL
+ * and provides paginated listing operations.
  *
- * Neden @Async?
- * DB yazma işlemi, HTTP response süresini etkilememeli.
- * 
- * @Async ile bu iş arka plan thread'inde yapılır, kullanıcı yanıtı beklemez.
- *        Örneğin: SOAP çağrısı 200ms + Log yazma 20ms = 220ms olmak yerine
- *        SOAP çağrısı 200ms (log parallel) = 200ms olur.
+ * Why is Pagination Mandatory?
+ * The api_logs table can contain millions of records in production.
+ * findAll() → pulling all rows into memory → OOM (Out of Memory) error.
+ * findAll(Pageable) → brings only the requested page → saves memory.
  *
- *        Neden @Transactional?
- *        DB yazma atomik olmalı. Hata durumunda rollback yapılır.
- *        propagation=REQUIRES_NEW: Çağıran transaction'dan bağımsız çalışır.
- *        (Çağıran transaction başarısız olsa bile log yazılır)
+ * With @Async, this job is done in a background thread, not waiting for user
+ * response.
  */
 @Slf4j
 @Service
@@ -36,23 +37,20 @@ public class ApiLogService {
     private final ObjectMapper objectMapper;
 
     /**
-     * API çağrısını veritabanına asenkron olarak loglar.
+     * Logs the API call asynchronously to the database.
      *
-     * @Async: Bu metod kendi thread'inde çalışır, çağıranı bloke etmez.
-     *         → @EnableAsync annotation'ı gereklidir
-     *         (FlightAggregatorApplication'da).
+     * @Async: This method runs in its own thread, does not block the caller.
+     *         → @EnableAsync annotation is required
+     *         (in FlightAggregatorApplication).
      *
-     * @Transactional: REQUIRES_NEW ile bağımsız transaction.
-     *                 → Çağıran başarısız olsa da log yazılır.
+     * @Transactional: Independent transaction with REQUIRES_NEW.
+     *                 → Log is written even if the caller fails.
      *
-     *                 Defensive programming: JSON dönüşüm hataları yakalanır,
-     *                 log işlemi hiçbir zaman ana akışı bozmamalıdır.
-     *
-     * @param endpoint   Çağrılan endpoint: "/api/v1/flights/search"
-     * @param request    Request nesnesi (JSON'a çevrilecek)
-     * @param response   Response nesnesi (JSON'a çevrilecek), null olabilir
-     * @param statusCode HTTP durum kodu
-     * @param durationMs İşlem süresi (milisaniye)
+     * @param endpoint   Called endpoint: "/api/v1/flights/search"
+     * @param request    Request object (to be converted to JSON)
+     * @param response   Response object (to be converted to JSON), can be null
+     * @param statusCode HTTP status code
+     * @param durationMs Duration of operation (milliseconds)
      */
     @Async
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
@@ -72,37 +70,71 @@ public class ApiLogService {
 
             apiLogRepository.save(logEntity);
 
-            log.debug("API log kaydedildi: endpoint={}, status={}, duration={}ms",
+            log.debug("API log saved: endpoint={}, status={}, duration={}ms",
                     endpoint, statusCode, durationMs);
 
         } catch (Exception e) {
-            // Log işlemi hiçbir zaman exception fırlatmamalı (fire-and-forget)
-            log.error("API log kaydedilemedi: {}", e.getMessage(), e);
+            // Log operation MUST NEVER throw an exception (fire-and-forget)
+            log.error("Failed to save API log: {}", e.getMessage(), e);
         }
     }
 
+    // =====================================================================
+    // Paginated Query Methods (Production-Safe)
+    // =====================================================================
+
     /**
-     * Tüm logları listeler.
-     * 
-     * @return Log nesneleri listesi
+     * Lists all logs with pagination.
+     *
+     * Example usage: Pageable.of(0, 20, Sort.by("createdAt").descending())
+     *
+     * @param pageable Page number, size, and sorting information
+     * @return Paginated log objects
      */
-    public java.util.List<ApiLogEntity> getAllLogs() {
+    public Page<ApiLogEntity> getAllLogs(Pageable pageable) {
+        return apiLogRepository.findAll(pageable);
+    }
+
+    /**
+     * Lists paginated logs for a specific endpoint.
+     *
+     * @param endpoint Endpoint path to search (e.g., /api/v1/flights/search)
+     * @param pageable Page number, size, and sorting information
+     * @return Paginated log objects
+     */
+    public Page<ApiLogEntity> getLogsByEndpoint(String endpoint, Pageable pageable) {
+        return apiLogRepository.findByEndpoint(endpoint, pageable);
+    }
+
+    // =====================================================================
+    // Legacy (Backward Compatible) — All data without pagination
+    // =====================================================================
+
+    /**
+     * Lists all logs (without pagination).
+     * 
+     * @deprecated Causes OOM risks in production; use getAllLogs(Pageable)
+     *             instead.
+     */
+    @Deprecated(since = "2.0", forRemoval = false)
+    public List<ApiLogEntity> getAllLogs() {
         return apiLogRepository.findAll();
     }
 
     /**
-     * Belirli bir endpoint için logları listeler.
+     * Lists all logs for a specific endpoint (without pagination).
      * 
-     * @param endpoint Aranacak endpoint regex veya string
-     * @return Log nesneleri listesi
+     * @deprecated Causes OOM risks in production; use getLogsByEndpoint(String,
+     *             Pageable) instead.
      */
-    public java.util.List<ApiLogEntity> getLogsByEndpoint(String endpoint) {
+    @Deprecated(since = "2.0", forRemoval = false)
+    public List<ApiLogEntity> getLogsByEndpoint(String endpoint) {
         return apiLogRepository.findByEndpoint(endpoint);
     }
 
     /**
-     * Nesneyi JSON string'e çevirir.
-     * Null-safe: null input → "null" string döner
+     * Converts the object to JSON string.
+     * Null-safe: null input → returns "null" string.
      */
     private String toJson(Object obj) {
         if (obj == null)
@@ -110,7 +142,7 @@ public class ApiLogService {
         try {
             return objectMapper.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
-            log.warn("JSON serialize hatası: {}", e.getMessage());
+            log.warn("JSON serialization error: {}", e.getMessage());
             return "\"serialization_error\"";
         }
     }
